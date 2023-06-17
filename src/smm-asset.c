@@ -29,6 +29,10 @@
 
 #include <jansson.h>
 
+enum http_return_codes {
+	HTTP_SUCCESS = 200,
+};
+
 bool smm_debug = false;
 
 void
@@ -82,12 +86,12 @@ smm_connection_close (smm_connection connection)
 }
 
 smm_asset
-smm_asset_create (smm_connection conn, const char *name, const char *type, int asset_id, int asset_type_id)
+smm_asset_create (smm_connection conn, const char *name, const char *type, long long asset_id, long long asset_type_id)
 {
 	smm_asset asset = calloc (1, sizeof (struct smm_asset_s));
 	asset->conn = conn;
-	asset->name = strdup (name);
-	asset->type = strdup (type);
+	asset->name = name ? strdup (name) : NULL;
+	asset->type = type ? strdup (type) : NULL;
 	asset->asset_id = asset_id;
 	asset->asset_type_id = asset_type_id;
 
@@ -98,7 +102,6 @@ bool
 smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * assets_count)
 {
 	struct buffer_s buf = { NULL, 0 };
-	json_t *json_root;
 	json_error_t json_error;
 
 	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/mine/json/", NULL, to_buffer, &buf);
@@ -106,7 +109,7 @@ smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * a
 	{
 		return false;
 	}
-	if (!(res->success && res->httpcode == 200))
+	if (!(res->success && res->httpcode == HTTP_SUCCESS))
 	{
 		smm_curl_res_free (res);
 		return false;
@@ -117,21 +120,21 @@ smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * a
 	*assets_count = 0;
 	*assets = NULL;
 
-	json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);
+	json_t *json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);
 	if (json_root)
 	{
 		json_t *json_assets = json_object_get (json_root, "assets");
 		if (json_assets)
 		{
-			size_t index;
-			json_t *value;
+			size_t index = 0;
+			json_t *value = NULL;
 
 			json_array_foreach (json_assets, index, value)
 			{
-				const char *key;
-				json_t *val;
-				int asset_id = -1;
-				int asset_type_id = -1;
+				const char *key = NULL;
+				json_t *val = NULL;
+				json_int_t asset_id = -1;
+				json_int_t asset_type_id = -1;
 				const char *name = NULL;
 				const char *type = NULL;
 				json_object_foreach (value, key, val)
@@ -205,7 +208,7 @@ smm_asset_free_assets (smm_assets assets, size_t assets_count)
 	free (assets);
 }
 
-static int
+static long long
 smm_asset_get_asset_id (smm_asset asset)
 {
 	return asset->asset_id;
@@ -234,61 +237,57 @@ smm_asset_type (smm_asset asset)
 static bool
 smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
 {
-	json_t *json_root;
 	json_error_t json_error;
 
-	json_root = json_loadb (buf->data, buf->bytes, 0, &json_error);
+	json_t *json_root = json_loadb (buf->data, buf->bytes, 0, &json_error);
 	if (json_root)
 	{
 		const char *command = NULL;
-		json_t *tmp;
 
-		tmp = json_object_get (json_root, "action");
+		json_t *tmp = json_object_get (json_root, "action");
 		if (tmp)
 		{
 			command = json_string_value (tmp);
-		}
-
-		if (strcmp (command, "GOTO") == 0)
-		{
-			/* Get lat and long as well */
-			tmp = json_object_get (json_root, "latitude");
-			if (tmp)
+			if (strcmp (command, "GOTO") == 0)
 			{
-				asset->last_command_lat = json_real_value (tmp);
+				/* Get lat and long as well */
+				tmp = json_object_get (json_root, "latitude");
+				if (tmp)
+				{
+					asset->last_command_lat = json_real_value (tmp);
+				}
+				tmp = json_object_get (json_root, "longitude");
+				if (tmp)
+				{
+					asset->last_command_lon = json_real_value (tmp);
+				}
+				asset->last_command = SMM_COMMAND_GOTO;
 			}
-			tmp = json_object_get (json_root, "longitude");
-			if (tmp)
+			else if (strcmp (command, "RON") == 0)
 			{
-				asset->last_command_lon = json_real_value (tmp);
+				asset->last_command = SMM_COMMAND_CONTINUE;
 			}
-			asset->last_command = SMM_COMMAND_GOTO;
+			else if (strcmp (command, "RTL") == 0)
+			{
+				asset->last_command = SMM_COMMAND_RTL;
+			}
+			else if (strcmp (command, "CIR") == 0)
+			{
+				asset->last_command = SMM_COMMAND_CIRCLE;
+			}
+			else if (strcmp (command, "AS") == 0)
+			{
+				asset->last_command = SMM_COMMAND_ABANDON_SEARCH;
+			}
+			else if (strcmp (command, "MC") == 0)
+			{
+				asset->last_command = SMM_COMMAND_MISSION_COMPLETE;
+			}
+			else
+			{
+				asset->last_command = SMM_COMMAND_UNKNOWN;
+			}
 		}
-		else if (strcmp (command, "RON") == 0)
-		{
-			asset->last_command = SMM_COMMAND_CONTINUE;
-		}
-		else if (strcmp (command, "RTL") == 0)
-		{
-			asset->last_command = SMM_COMMAND_RTL;
-		}
-		else if (strcmp (command, "CIR") == 0)
-		{
-			asset->last_command = SMM_COMMAND_CIRCLE;
-		}
-		else if (strcmp (command, "AS") == 0)
-		{
-			asset->last_command = SMM_COMMAND_ABANDON_SEARCH;
-		}
-		else if (strcmp (command, "MC") == 0)
-		{
-			asset->last_command = SMM_COMMAND_MISSION_COMPLETE;
-		}
-		else
-		{
-			asset->last_command = SMM_COMMAND_UNKNOWN;
-		}
-
 
 		json_decref (json_root);
 	}
@@ -343,7 +342,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
 		free (page);
 		return false;
 	}
-	if (!(res->success && res->httpcode == 200))
+	if (!(res->success && res->httpcode == HTTP_SUCCESS))
 	{
 		smm_curl_res_free (res);
 		free (page);
@@ -381,7 +380,7 @@ smm_search_create (smm_asset asset, const char *url, uint64_t length, uint64_t d
 {
 	smm_search search = calloc (1, sizeof (struct smm_search_s));
 	search->asset = asset;
-	search->url = strdup (url);
+	search->url = url ? strdup (url) : NULL;
 	search->length = length;
 	search->distance = distance;
 	search->sweep_width = sweep_width;
@@ -430,7 +429,7 @@ smm_search_destroy (smm_search search)
 }
 
 static smm_waypoint
-smm_waypoint_create (float lat, float lon)
+smm_waypoint_create (double lat, double lon)
 {
 	smm_waypoint wp = calloc (1, sizeof (struct smm_waypoint_s));
 	wp->lat = lat;
@@ -449,7 +448,7 @@ bool
 smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t * waypoints_count)
 {
 	struct buffer_s buf = { NULL, 0 };
-	json_t *json_root;
+	json_t *json_root = NULL;
 	json_error_t json_error;
 
 	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf);
@@ -458,7 +457,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t *
 	{
 		return false;
 	}
-	else if (!(res->success && res->httpcode == 200))
+	else if (!(res->success && res->httpcode == HTTP_SUCCESS))
 	{
 		/* Login, try again */
 		smm_curl_res_free (res);
@@ -482,8 +481,8 @@ smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t *
 			{
 
 				printf ("Parsing waypoints\n");
-				size_t index;
-				json_t *value;
+				size_t index = 0;
+				json_t *value = NULL;
 
 				json_t *json_search = json_array_get (json_features, 0);
 				if (json_search == NULL)
@@ -502,8 +501,8 @@ smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t *
 				}
 				json_array_foreach (json_coords, index, value)
 				{
-					float lat = 0.0;
-					float lon = 0.0;
+					double lat = 0.0;
+					double lon = 0.0;
 					json_t *json_lat = json_array_get (value, 1);
 					json_t *json_lon = json_array_get (value, 0);
 					lat = json_real_value (json_lat);
@@ -547,7 +546,7 @@ smm_search_action (smm_search search, const char *action)
 		if (json_str)
 		{
 			*json_str = '\0';
-			if (asprintf (&action_page, "%s/%s/?asset_id=%i", tmp, action, smm_asset_get_asset_id (search->asset)) < 0)
+			if (asprintf (&action_page, "%s/%s/?asset_id=%lli", tmp, action, smm_asset_get_asset_id (search->asset)) < 0)
 			{
 				free (tmp);
 				return false;
@@ -565,7 +564,7 @@ smm_search_action (smm_search search, const char *action)
 	{
 		return false;
 	}
-	else if (!(res->success && res->httpcode == 200))
+	else if (!(res->success && res->httpcode == HTTP_SUCCESS))
 	{
 		smm_curl_res_free (res);
 		return false;
@@ -609,7 +608,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 	struct buffer_s buf = { NULL, 0 };
 
 	char *page = NULL;
-	if (asprintf (&page, "/search/find/closest/?asset_id=%i&latitude=%lf&longitude=%lf", asset->asset_id, latitude, longitude) < 0)
+	if (asprintf (&page, "/search/find/closest/?asset_id=%lli&latitude=%lf&longitude=%lf", asset->asset_id, latitude, longitude) < 0)
 	{
 		return NULL;
 	}
@@ -620,7 +619,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 		free (page);
 		return false;
 	}
-	if (!(res->success && res->httpcode == 200))
+	if (!(res->success && res->httpcode == HTTP_SUCCESS))
 	{
 		/* login and try again */
 		smm_curl_res_free (res);
@@ -631,7 +630,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 
 	if (res->content_type != NULL && strcmp (res->content_type, "application/json") == 0)
 	{
-		json_t *json_root;
+		json_t *json_root = NULL;
 		json_error_t json_error;
 
 		json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);

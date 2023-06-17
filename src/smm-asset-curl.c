@@ -38,6 +38,13 @@
 #error No tidy header(s)
 #endif
 
+enum http_return_codes {
+	HTTP_SUCCESS = 200,
+	HTTP_MOVED_PERMANENTLY = 301,
+	HTTP_FOUND = 302,
+	HTTP_SEE_OTHER = 303,
+};
+
 void
 smm_curl_res_free (struct smm_curl_res_s *res)
 {
@@ -75,10 +82,9 @@ to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 }
 
 static struct smm_curl_res_s *
-_smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
+smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const char *post_data,
 				   size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data)
 {
-	CURL *curl;
 	struct smm_curl_res_s *res = NULL;
 
 	DEBUG ("(%p, %s, %s, %p)\n", (void *) conn, path, post_data, write_data);
@@ -90,7 +96,7 @@ _smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const 
 	}
 
 	pthread_mutex_lock (&conn->lock);
-	curl = conn->curl;
+	CURL *curl = conn->curl;
 	if (curl == NULL)
 	{
 		DEBUG ("creating curl object\n");
@@ -148,7 +154,7 @@ _smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const 
 	DEBUG ("httpcode = %li\n", res->httpcode);
 	switch (res->httpcode)
 	{
-		case 200:
+		case HTTP_SUCCESS:
 		{
 			char *ct = NULL;
 			if (curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &ct) == CURLE_OK)
@@ -157,9 +163,9 @@ _smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const 
 			}
 		}
 			break;
-		case 301:
-		case 302:
-		case 303:
+		case HTTP_MOVED_PERMANENTLY:
+		case HTTP_FOUND:
+		case HTTP_SEE_OTHER:
 		{
 			char *redirect_url = NULL;
 			if (curl_easy_getinfo (curl, CURLINFO_REDIRECT_URL, &redirect_url) == CURLE_OK)
@@ -193,7 +199,7 @@ populate_tidy (char *ptr, size_t size, size_t nmemb, void *userdata)
 }
 
 static bool
-_extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
+extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 {
 	bool res = false;
 	for (TidyNode child = tidyGetChild (tnod); child; child = tidyGetNext (child))
@@ -225,7 +231,7 @@ _extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 				}
 			}
 		}
-		res = _extract_csrfmiddlewaretoken (tdoc, child, token);
+		res = extract_csrfmiddlewaretoken (tdoc, child, token);
 		if (res)
 		{
 			return res;
@@ -240,10 +246,9 @@ bool
 smm_connection_login (smm_connection connection)
 {
 	bool res = false;
-	TidyDoc tdoc;
 	TidyBuffer docbuf = { 0 };
 
-	tdoc = tidyCreate ();
+	TidyDoc tdoc = tidyCreate ();
 	tidyOptSetBool (tdoc, TidyForceOutput, yes);
 	tidyOptSetInt (tdoc, TidyWrapLen, 4096);
 	tidyBufInit (&docbuf);
@@ -251,13 +256,13 @@ smm_connection_login (smm_connection connection)
 	/* Get the login page, so we can get the csrf cookie + token */
 	struct smm_curl_res_s *res_get = smm_connection_curl_retrieve_url (connection, "/accounts/login/", NULL, populate_tidy, &docbuf);
 
-	if (res_get && res_get->success && res_get->httpcode == 200)
+	if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
 	{
 		tidyParseBuffer (tdoc, &docbuf);
 		tidyCleanAndRepair (tdoc);
 
 		/* find the input token with the csrfmiddlewaretoken */
-		_extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &connection->csrfmiddlewaretoken);
+		extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &connection->csrfmiddlewaretoken);
 
 		if (connection->csrfmiddlewaretoken)
 		{
@@ -267,7 +272,7 @@ smm_connection_login (smm_connection connection)
 			     connection->pass) >= 0)
 			{
 				struct smm_curl_res_s *res_post = smm_connection_curl_retrieve_url (connection, "/accounts/login/", post_data, NULL, NULL);
-				if (res_post && res_post->success && res_post->httpcode == 302)
+				if (res_post && res_post->success && res_post->httpcode == HTTP_FOUND)
 				{
 					res = true;
 					connection->state = SMM_CONNECTION_CONNECTED;
@@ -304,13 +309,13 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 {
 	bool retry = true;
 	int retries = 0;
-	struct smm_curl_res_s *res = _smm_connection_curl_retrieve_url (conn, path, post_data, write_func, write_data);
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data);
 
 	while (retry && retries < 3 && res != NULL)
 	{
 		retry = false;
 		retries++;
-		if (res->success && res->httpcode == 302 && res->redirect_url)
+		if (res->success && res->httpcode == HTTP_FOUND && res->redirect_url)
 		{
 			DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
 			/* It's possible we need to upgrade to https */
@@ -359,7 +364,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 		if (retry && retries < 3)
 		{
 			smm_curl_res_free (res);
-			res = _smm_connection_curl_retrieve_url (conn, path, post_data, write_func, write_data);
+			res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data);
 		}
 	}
 

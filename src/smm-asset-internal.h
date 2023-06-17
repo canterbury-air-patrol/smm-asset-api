@@ -56,11 +56,11 @@ struct smm_asset_s
 	smm_connection conn;
 	char *name;
 	char *type;
-	int asset_id;
-	int asset_type_id;
+	long long asset_id;
+	long long asset_type_id;
 	smm_asset_command last_command;
-	float last_command_lat;
-	float last_command_lon;
+	double last_command_lat;
+	double last_command_lon;
 };
 
 struct smm_search_s
@@ -94,5 +94,5 @@ struct smm_curl_res_s *smm_connection_curl_retrieve_url (smm_connection conn, co
 							 size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data);
 bool smm_connection_login (smm_connection connection);
 
-smm_asset smm_asset_create (smm_connection connection, const char *name, const char *type, int asset_id, int asset_type_id);
+smm_asset smm_asset_create (smm_connection connection, const char *name, const char *type, long long asset_id, long long asset_type_id);
 void smm_asset_free_asset (smm_asset assets);
