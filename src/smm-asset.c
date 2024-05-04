@@ -331,7 +331,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
 	struct buffer_s buf = { NULL, 0 };
 
 	char *page = NULL;
-	if (asprintf (&page, "/data/assets/%s/position/add/?lat=%lf&lon=%lf&alt=%u&bearing=%u&fix=%u", asset->name, latitude, longitude, altitude, bearing, fix)
+	if (asprintf (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&bearing=%u&fix=%u", asset->asset_id, latitude, longitude, altitude, bearing, fix)
 	    < 0)
 	{
 		return false;

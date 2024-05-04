@@ -1,4 +1,4 @@
-AC_INIT([libsmm-asset], [0.2.3])
+AC_INIT([libsmm-asset], [0.3.1])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
 AC_CONFIG_HEADERS([config.h])
