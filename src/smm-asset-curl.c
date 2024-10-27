@@ -83,7 +83,7 @@ to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 
 static struct smm_curl_res_s *
 smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const char *post_data,
-				   size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data)
+				   size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data, bool json)
 {
 	struct smm_curl_res_s *res = NULL;
 
@@ -145,10 +145,22 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		curl_easy_setopt (curl, CURLOPT_WRITEDATA, NULL);
 	}
 
+	struct curl_slist *headers = NULL;
+
+	if (json)
+	{
+		headers = curl_slist_append (headers, "Accept: application/json");
+		curl_easy_setopt (curl, CURLOPT_HTTPHEADER, headers);
+	}
+
 	DEBUG ("fetching %s\n", res->full_uri);
 	CURLcode cres = curl_easy_perform (curl);
 	DEBUG ("curl returned %i\n", cres);
 	res->success = (cres == CURLE_OK);
+
+	curl_easy_setopt (curl, CURLOPT_HTTPHEADER, NULL);
+	curl_slist_free_all (headers);
+	headers = NULL;
 
 	curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &res->httpcode);
 	DEBUG ("httpcode = %li\n", res->httpcode);
@@ -254,7 +266,7 @@ smm_connection_login (smm_connection connection)
 	tidyBufInit (&docbuf);
 
 	/* Get the login page, so we can get the csrf cookie + token */
-	struct smm_curl_res_s *res_get = smm_connection_curl_retrieve_url (connection, "/accounts/login/", NULL, populate_tidy, &docbuf);
+	struct smm_curl_res_s *res_get = smm_connection_curl_retrieve_url (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
 
 	if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
 	{
@@ -271,7 +283,7 @@ smm_connection_login (smm_connection connection)
 			    (&post_data, "csrfmiddlewaretoken=%s&username=%s&password=%s", connection->csrfmiddlewaretoken, connection->user,
 			     connection->pass) >= 0)
 			{
-				struct smm_curl_res_s *res_post = smm_connection_curl_retrieve_url (connection, "/accounts/login/", post_data, NULL, NULL);
+				struct smm_curl_res_s *res_post = smm_connection_curl_retrieve_url (connection, "/accounts/login/", post_data, NULL, NULL, false);
 				if (res_post && res_post->success && res_post->httpcode == HTTP_FOUND)
 				{
 					res = true;
@@ -305,11 +317,11 @@ smm_connection_login (smm_connection connection)
 
 struct smm_curl_res_s *
 smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
-				  size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data)
+				  size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data, bool json)
 {
 	bool retry = true;
 	int retries = 0;
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data);
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data, json);
 
 	while (retry && retries < 3 && res != NULL)
 	{
@@ -364,7 +376,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 		if (retry && retries < 3)
 		{
 			smm_curl_res_free (res);
-			res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data);
+			res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data, json);
 		}
 	}
 

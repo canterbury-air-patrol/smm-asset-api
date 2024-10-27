@@ -91,7 +91,7 @@ size_t to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata);
 
 void smm_curl_res_free (struct smm_curl_res_s *);
 struct smm_curl_res_s *smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
-							 size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data);
+							 size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data, bool json);
 bool smm_connection_login (smm_connection connection);
 
 smm_asset smm_asset_create (smm_connection connection, const char *name, const char *type, long long asset_id, long long asset_type_id);
