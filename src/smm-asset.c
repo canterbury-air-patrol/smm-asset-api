@@ -104,7 +104,7 @@ smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * a
 	struct buffer_s buf = { NULL, 0 };
 	json_error_t json_error;
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/mine/json/", NULL, to_buffer, &buf);
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
 	if (res == NULL)
 	{
 		return false;
@@ -336,7 +336,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
 		return false;
 	}
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf);
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
 	if (res == NULL)
 	{
 		free (page);
@@ -451,7 +451,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t *
 	json_t *json_root = NULL;
 	json_error_t json_error;
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf);
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf, true);
 
 	if (res == NULL)
 	{
@@ -540,26 +540,16 @@ smm_search_action (smm_search search, const char *action)
 	char *action_page = NULL;
 	struct buffer_s buf = { NULL, 0 };
 
+	if (asprintf (&action_page, "%s%s/?asset_id=%lli", search->url, action, smm_asset_get_asset_id (search->asset)) < 0)
 	{
-		char *tmp = strdup (search->url);
-		char *json_str = strstr (tmp, "/json/");
-		if (json_str)
-		{
-			*json_str = '\0';
-			if (asprintf (&action_page, "%s/%s/?asset_id=%lli", tmp, action, smm_asset_get_asset_id (search->asset)) < 0)
-			{
-				free (tmp);
-				return false;
-			}
-		}
-		free (tmp);
+		return false;
 	}
 	if (action_page == NULL)
 	{
 		return false;
 	}
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, action_page, NULL, to_buffer, &buf);
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, action_page, NULL, to_buffer, &buf, false);
 	if (res == NULL)
 	{
 		return false;
@@ -613,7 +603,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 		return NULL;
 	}
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf);
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
 	if (res == NULL)
 	{
 		free (page);
