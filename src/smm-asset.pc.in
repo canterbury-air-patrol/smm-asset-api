@@ -8,4 +8,4 @@ Description: Library to act as an Asset for Search Management Map
 URL: https://github.com/canterbury-air-patrol/smm-asset
 Version: @VERSION@
 Libs: -lsmmasset
-Cflags:
+Cflags: -I${includedir}
