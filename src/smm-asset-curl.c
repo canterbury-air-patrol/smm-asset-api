@@ -279,9 +279,12 @@ smm_connection_login (smm_connection connection)
 		if (connection->csrfmiddlewaretoken)
 		{
 			char *post_data = NULL;
-			if (asprintf
-			    (&post_data, "csrfmiddlewaretoken=%s&username=%s&password=%s", connection->csrfmiddlewaretoken, connection->user,
-			     connection->pass) >= 0)
+			char *esc_csrf = curl_easy_escape (connection->curl, connection->csrfmiddlewaretoken, 0);
+			char *esc_user = curl_easy_escape (connection->curl, connection->user, 0);
+			char *esc_pass = curl_easy_escape (connection->curl, connection->pass, 0);
+
+			if (esc_csrf && esc_user && esc_pass && asprintf
+			    (&post_data, "csrfmiddlewaretoken=%s&username=%s&password=%s", esc_csrf, esc_user, esc_pass) >= 0)
 			{
 				struct smm_curl_res_s *res_post = smm_connection_curl_retrieve_url (connection, "/accounts/login/", post_data, NULL, NULL, false);
 				if (res_post && res_post->success && res_post->httpcode == HTTP_FOUND)
@@ -296,6 +299,9 @@ smm_connection_login (smm_connection connection)
 				smm_curl_res_free (res_post);
 				free (post_data);
 			}
+			curl_free (esc_csrf);
+			curl_free (esc_user);
+			curl_free (esc_pass);
 		}
 	}
 	else if (!res_get)
