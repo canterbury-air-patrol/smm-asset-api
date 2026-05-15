@@ -109,32 +109,20 @@ smm_asset_create (smm_connection conn, const char *name, const char *type, long 
 }
 
 bool
-smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * assets_count)
+smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets * assets, size_t * assets_count)
 {
-	struct buffer_s buf = { NULL, 0 };
 	json_error_t json_error;
-
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
-	if (res == NULL)
-	{
-		return false;
-	}
-	if (!(res->success && res->httpcode == HTTP_SUCCESS))
-	{
-		smm_curl_res_free (res);
-		return false;
-	}
-	smm_curl_res_free (res);
+	bool res = false;
 
 	/* Parse the assets */
 	*assets_count = 0;
 	*assets = NULL;
 
-	json_t *json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);
+	json_t *json_root = json_loadb (data, len, 0, &json_error);
 	if (json_root)
 	{
 		json_t *json_assets = json_object_get (json_root, "assets");
-		if (json_assets)
+		if (json_is_array (json_assets))
 		{
 			size_t index = 0;
 			json_t *value = NULL;
@@ -165,38 +153,61 @@ smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * a
 					{
 						type = json_string_value (val);
 					}
+				}
+				smm_asset new_asset = smm_asset_create (connection, name, type, asset_id, asset_type_id);
+				if (new_asset)
+				{
+					smm_asset *tmp = realloc (*assets, (*assets_count + 1) * sizeof (smm_asset));
+					if (tmp)
+					{
+						*assets = tmp;
+						(*assets)[*assets_count] = new_asset;
+						*assets_count += 1;
+					}
 					else
 					{
-						if (json_is_integer (val))
-						{
-							printf ("%s = %lli\n", key, json_integer_value (val));
-						}
-						else if (json_is_string (val))
-						{
-							printf ("%s = %s\n", key, json_string_value (val));
-						}
+						smm_asset_free_asset (new_asset);
 					}
 				}
-				*(assets_count) += 1;
-				*assets = realloc (*assets, *assets_count * sizeof (smm_asset));
-				(*assets)[(*assets_count) - 1] = smm_asset_create (connection, name, type, asset_id, asset_type_id);
 			}
+			res = true;
 		}
 		else
 		{
-			printf ("Didn't find assets\n");
+			DEBUG ("Didn't find assets array in JSON\n");
 		}
+		json_decref (json_root);
 	}
 	else
 	{
-		printf ("Error on line %i: %s\n", json_error.line, json_error.text);
+		DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
 	}
 
-	json_decref (json_root);
+	return res;
+}
 
+bool
+smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * assets_count)
+{
+	struct buffer_s buf = { NULL, 0 };
+
+	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
+	if (res == NULL)
+	{
+		return false;
+	}
+	if (!(res->success && res->httpcode == HTTP_SUCCESS))
+	{
+		smm_curl_res_free (res);
+		free (buf.data);
+		return false;
+	}
+	smm_curl_res_free (res);
+
+	bool parse_res = smm_parse_assets (connection, buf.data, buf.bytes, assets, assets_count);
 
 	free (buf.data);
-	return true;
+	return parse_res;
 }
 
 

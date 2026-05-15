@@ -42,6 +42,49 @@ START_TEST(test_csrf_extraction_too_long)
 }
 END_TEST
 
+START_TEST(test_assets_parsing)
+{
+    const char *json = "{\"assets\": [{\"id\": 1, \"type_id\": 2, \"name\": \"Asset 1\", \"type_name\": \"Type 1\"}, {\"id\": 3, \"type_id\": 4, \"name\": \"Asset 2\", \"type_name\": \"Type 2\"}]}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets(NULL, json, strlen(json), &assets, &count);
+    
+    ck_assert_uint_eq(res, true);
+    ck_assert_uint_eq(count, 2);
+    ck_assert_str_eq(smm_asset_name(assets[0]), "Asset 1");
+    ck_assert_str_eq(smm_asset_type(assets[0]), "Type 1");
+    ck_assert_str_eq(smm_asset_name(assets[1]), "Asset 2");
+    ck_assert_str_eq(smm_asset_type(assets[1]), "Type 2");
+    
+    smm_asset_free_assets(assets, count);
+}
+END_TEST
+
+START_TEST(test_assets_parsing_empty)
+{
+    const char *json = "{\"assets\": []}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets(NULL, json, strlen(json), &assets, &count);
+    
+    ck_assert_uint_eq(res, true);
+    ck_assert_uint_eq(count, 0);
+    ck_assert_ptr_null(assets);
+}
+END_TEST
+
+START_TEST(test_assets_parsing_invalid)
+{
+    const char *json = "{\"not_assets\": []}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets(NULL, json, strlen(json), &assets, &count);
+    
+    ck_assert_uint_eq(res, false);
+    ck_assert_uint_eq(count, 0);
+}
+END_TEST
+
 Suite * smm_suite(void)
 {
     Suite *s;
@@ -55,6 +98,12 @@ Suite * smm_suite(void)
     tcase_add_test(tc_csrf, test_csrf_extraction_invalid_chars);
     tcase_add_test(tc_csrf, test_csrf_extraction_too_long);
     suite_add_tcase(s, tc_csrf);
+
+    TCase *tc_assets = tcase_create("Assets");
+    tcase_add_test(tc_assets, test_assets_parsing);
+    tcase_add_test(tc_assets, test_assets_parsing_empty);
+    tcase_add_test(tc_assets, test_assets_parsing_invalid);
+    suite_add_tcase(s, tc_assets);
 
     return s;
 }
