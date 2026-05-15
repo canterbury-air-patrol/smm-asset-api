@@ -85,6 +85,44 @@ START_TEST(test_assets_parsing_invalid)
 }
 END_TEST
 
+START_TEST(test_command_parsing_goto)
+{
+    const char *json = "{\"action\": \"GOTO\", \"latitude\": -43.5, \"longitude\": 172.6}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command(json, strlen(json), &cmd, &lat, &lon);
+    
+    ck_assert_uint_eq(res, true);
+    ck_assert_int_eq(cmd, SMM_COMMAND_GOTO);
+    ck_assert_ldouble_eq_tol(lat, -43.5, 0.0001);
+    ck_assert_ldouble_eq_tol(lon, 172.6, 0.0001);
+}
+END_TEST
+
+START_TEST(test_command_parsing_rtl)
+{
+    const char *json = "{\"action\": \"RTL\"}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command(json, strlen(json), &cmd, &lat, &lon);
+    
+    ck_assert_uint_eq(res, true);
+    ck_assert_int_eq(cmd, SMM_COMMAND_RTL);
+}
+END_TEST
+
+START_TEST(test_command_parsing_unknown)
+{
+    const char *json = "{\"action\": \"INVALID\"}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command(json, strlen(json), &cmd, &lat, &lon);
+    
+    ck_assert_uint_eq(res, true);
+    ck_assert_int_eq(cmd, SMM_COMMAND_UNKNOWN);
+}
+END_TEST
+
 Suite * smm_suite(void)
 {
     Suite *s;
@@ -104,6 +142,12 @@ Suite * smm_suite(void)
     tcase_add_test(tc_assets, test_assets_parsing_empty);
     tcase_add_test(tc_assets, test_assets_parsing_invalid);
     suite_add_tcase(s, tc_assets);
+
+    TCase *tc_commands = tcase_create("Commands");
+    tcase_add_test(tc_commands, test_command_parsing_goto);
+    tcase_add_test(tc_commands, test_command_parsing_rtl);
+    tcase_add_test(tc_commands, test_command_parsing_unknown);
+    suite_add_tcase(s, tc_commands);
 
     return s;
 }
