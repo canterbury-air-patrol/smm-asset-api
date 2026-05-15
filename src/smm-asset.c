@@ -255,58 +255,63 @@ smm_asset_type (smm_asset asset)
 	return NULL;
 }
 
-static bool
-smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
+bool
+smm_parse_command (const char *data, size_t len, smm_asset_command * command, double *lat, double *lon)
 {
 	json_error_t json_error;
+	bool res = false;
 
-	json_t *json_root = json_loadb (buf->data, buf->bytes, 0, &json_error);
+	*command = SMM_COMMAND_UNKNOWN;
+
+	json_t *json_root = json_loadb (data, len, 0, &json_error);
 	if (json_root)
 	{
-		const char *command = NULL;
-
 		json_t *tmp = json_object_get (json_root, "action");
-		if (tmp)
+		if (json_is_string (tmp))
 		{
-			command = json_string_value (tmp);
-			if (strcmp (command, "GOTO") == 0)
+			const char *cmd_str = json_string_value (tmp);
+			if (cmd_str)
 			{
-				/* Get lat and long as well */
-				tmp = json_object_get (json_root, "latitude");
-				if (tmp)
+				res = true;
+				if (strcmp (cmd_str, "GOTO") == 0)
 				{
-					asset->last_command_lat = json_real_value (tmp);
+					/* Get lat and long as well */
+					tmp = json_object_get (json_root, "latitude");
+					if (json_is_real (tmp))
+					{
+						*lat = json_real_value (tmp);
+					}
+					tmp = json_object_get (json_root, "longitude");
+					if (json_is_real (tmp))
+					{
+						*lon = json_real_value (tmp);
+					}
+					*command = SMM_COMMAND_GOTO;
 				}
-				tmp = json_object_get (json_root, "longitude");
-				if (tmp)
+				else if (strcmp (cmd_str, "RON") == 0)
 				{
-					asset->last_command_lon = json_real_value (tmp);
+					*command = SMM_COMMAND_CONTINUE;
 				}
-				asset->last_command = SMM_COMMAND_GOTO;
-			}
-			else if (strcmp (command, "RON") == 0)
-			{
-				asset->last_command = SMM_COMMAND_CONTINUE;
-			}
-			else if (strcmp (command, "RTL") == 0)
-			{
-				asset->last_command = SMM_COMMAND_RTL;
-			}
-			else if (strcmp (command, "CIR") == 0)
-			{
-				asset->last_command = SMM_COMMAND_CIRCLE;
-			}
-			else if (strcmp (command, "AS") == 0)
-			{
-				asset->last_command = SMM_COMMAND_ABANDON_SEARCH;
-			}
-			else if (strcmp (command, "MC") == 0)
-			{
-				asset->last_command = SMM_COMMAND_MISSION_COMPLETE;
-			}
-			else
-			{
-				asset->last_command = SMM_COMMAND_UNKNOWN;
+				else if (strcmp (cmd_str, "RTL") == 0)
+				{
+					*command = SMM_COMMAND_RTL;
+				}
+				else if (strcmp (cmd_str, "CIR") == 0)
+				{
+					*command = SMM_COMMAND_CIRCLE;
+				}
+				else if (strcmp (cmd_str, "AS") == 0)
+				{
+					*command = SMM_COMMAND_ABANDON_SEARCH;
+				}
+				else if (strcmp (cmd_str, "MC") == 0)
+				{
+					*command = SMM_COMMAND_MISSION_COMPLETE;
+				}
+				else
+				{
+					*command = SMM_COMMAND_UNKNOWN;
+				}
 			}
 		}
 
@@ -314,11 +319,16 @@ smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
 	}
 	else
 	{
-		printf ("Error on line %i: %s\n", json_error.line, json_error.text);
-		asset->last_command = SMM_COMMAND_UNKNOWN;
+		DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
 	}
 
-	return true;
+	return res;
+}
+
+static bool
+smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
+{
+	return smm_parse_command (buf->data, buf->bytes, &asset->last_command, &asset->last_command_lat, &asset->last_command_lon);
 }
 
 
