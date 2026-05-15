@@ -12,11 +12,13 @@ LT_INIT([disable-static pic-only])
 PKG_CHECK_MODULES([TIDY],[tidy])
 PKG_CHECK_MODULES([CURL],[libcurl])
 PKG_CHECK_MODULES([JANSSON],[jansson])
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 AC_CHECK_HEADERS([tidy.h],[],[
 AC_CHECK_HEADERS([tidy/tidy.h])])
 
 AC_CONFIG_FILES([Makefile
 	src/Makefile
+	tests/Makefile
 	src/smm-asset.pc])
 AC_OUTPUT
