@@ -394,36 +394,34 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 		{
 			DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
 			/* It's possible we need to upgrade to https */
-			if (strncmp (conn->host, "https://", 8) != 0)
+			if (strncmp (conn->host, "https://", 8) != 0 && strncmp (res->redirect_url, "https://", 8) == 0)
 			{
-				if (strncmp (res->redirect_url, "https://", 8) == 0)
+				/* Upgrade to https */
+				DEBUG ("Upgrading to https\n");
+				char *new_host = NULL;
+				if (strncmp (conn->host, "http://", 7) == 0)
 				{
-					/* Upgrade to https */
-					DEBUG ("Upgrading to https\n");
-					char *new_host = NULL;
-					if (strncmp (conn->host, "http://", 7) == 0)
+					if (asprintf (&new_host, "https://%s", &conn->host[7]) < 0)
 					{
-						if (asprintf (&new_host, "https://%s", &conn->host[7]) < 0)
-						{
-							DEBUG ("Failed to create new host\n");
-						}
-					}
-					else
-					{
-						if (asprintf (&new_host, "https://%s", conn->host) < 0)
-						{
-							DEBUG ("Failed to create new host\n");
-						}
-					}
-					if (new_host)
-					{
-						free (conn->host);
-						conn->host = new_host;
-						retry = true;
+						DEBUG ("Failed to create new host\n");
 					}
 				}
+				else
+				{
+					if (asprintf (&new_host, "https://%s", conn->host) < 0)
+					{
+						DEBUG ("Failed to create new host\n");
+					}
+				}
+				if (new_host)
+				{
+					free (conn->host);
+					conn->host = new_host;
+					retry = true;
+				}
 			}
-			else if (strstr (res->redirect_url, "accounts/login") != NULL)
+
+			if (!retry && strstr (res->redirect_url, "accounts/login") != NULL)
 			{
 				DEBUG ("Login required\n");
 				if (smm_asset_connection_login (conn))
@@ -431,7 +429,8 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 					retry = true;
 				}
 			}
-			else
+
+			if (!retry)
 			{
 				DEBUG ("Redirected to %s\n", res->redirect_url);
 			}
