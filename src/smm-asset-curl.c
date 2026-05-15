@@ -97,6 +97,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 
 	pthread_mutex_lock (&conn->lock);
 	CURL *curl = conn->curl;
+	bool verify_tls = conn->verify_tls;
 	if (curl == NULL)
 	{
 		DEBUG ("creating curl object\n");
@@ -115,8 +116,8 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 	}
 
 	curl_easy_setopt (curl, CURLOPT_FAILONERROR, true);
-	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, verify_tls ? 1L : 0L);
+	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, verify_tls ? 2L : 0L);
 	curl_easy_setopt (curl, CURLOPT_COOKIEFILE, "");
 	curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 0L);
 	curl_easy_setopt (curl, CURLOPT_URL, res->full_uri);
@@ -255,7 +256,7 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 
 
 bool
-smm_connection_login (smm_connection connection)
+smm_asset_connection_login (smm_connection connection)
 {
 	bool res = false;
 	TidyBuffer docbuf = { 0 };
@@ -369,7 +370,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 			else if (strstr (res->redirect_url, "accounts/login") != NULL)
 			{
 				DEBUG ("Login required\n");
-				if (smm_connection_login (conn))
+				if (smm_asset_connection_login (conn))
 				{
 					retry = true;
 				}

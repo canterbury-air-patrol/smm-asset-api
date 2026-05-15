@@ -53,9 +53,8 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
 	conn->host = strdup (host);
 	conn->user = strdup (user);
 	conn->pass = strdup (pass);
+	conn->verify_tls = true;
 	pthread_mutex_init (&conn->lock, NULL);
-
-	smm_connection_login (conn);
 
 	return conn;
 }
@@ -68,6 +67,17 @@ smm_asset_connection_get_state (smm_connection connection)
 		return SMM_CONNECTION_UNKNOWN;
 	}
 	return connection->state;
+}
+
+void
+smm_asset_connection_tls_verify_set (smm_connection connection, bool verify)
+{
+	if (connection != NULL)
+	{
+		pthread_mutex_lock (&connection->lock);
+		connection->verify_tls = verify;
+		pthread_mutex_unlock (&connection->lock);
+	}
 }
 
 void

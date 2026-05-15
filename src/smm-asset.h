@@ -116,6 +116,14 @@ smm_connection smm_asset_connect (const char *host, const char *user, const char
  */
 smm_connection_status smm_asset_connection_get_state (smm_connection connection);
 
+/**
+ * Enable/disable TLS verification for a connection.
+ * TLS verification is enabled by default.
+ *
+ * @param connection the smm_connection object
+ * @param verify true to enable TLS verification, false to disable
+ */
+void smm_asset_connection_tls_verify_set (smm_connection connection, bool verify);
 
 /**
  * Close a connection to smm and free associated resources
