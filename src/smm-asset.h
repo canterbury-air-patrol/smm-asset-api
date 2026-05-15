@@ -70,6 +70,7 @@ typedef enum
 	SMM_CONNECTION_HOST_INVALID,	/*!< Host URL invalid, i.e. not http(s):// or not a valid domain */
 	SMM_CONNECTION_NO_HOST_CONNECTION,	/*!< Unable to connect to host */
 	SMM_CONNECTION_AUTHENTICATION_FAILURE,	/*!< Unable to authenticate with host */
+	SMM_CONNECTION_PROTOCOL_ERROR,	/*!< Unexpected response from host */
 	SMM_CONNECTION_FAILURE,	/*!< Unable to communicate, for another reason */
 } smm_connection_status;
 

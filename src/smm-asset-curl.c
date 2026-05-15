@@ -222,6 +222,8 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 		{
 			if (strcmp (name, "input") == 0)
 			{
+				bool is_csrf = false;
+				ctmbstr value = NULL;
 				/* check the attributes */
 				for (TidyAttr attr = tidyAttrFirst (child); attr; attr = tidyAttrNext (attr))
 				{
@@ -230,16 +232,45 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 					{
 						if (strcmp (tidyAttrValue (attr), "csrfmiddlewaretoken") == 0)
 						{
-							res = true;
+							is_csrf = true;
 						}
 					}
 					else if (strcmp (attrName, "value") == 0)
 					{
-						if (res)
+						value = tidyAttrValue (attr);
+					}
+				}
+				if (is_csrf && value)
+				{
+					size_t len = strlen (value);
+					if (len > 0 && len < 256)
+					{
+						/* Validate token characters: [A-Za-z0-9_\-] */
+						bool valid = true;
+						for (size_t i = 0; i < len; i++)
 						{
-							*token = strdup (tidyAttrValue (attr));
+							if (!((value[i] >= 'a' && value[i] <= 'z') ||
+							      (value[i] >= 'A' && value[i] <= 'Z') ||
+							      (value[i] >= '0' && value[i] <= '9') ||
+							      (value[i] == '_') || (value[i] == '-')))
+							{
+								valid = false;
+								break;
+							}
+						}
+						if (valid)
+						{
+							*token = strdup (value);
 							return true;
 						}
+						else
+						{
+							DEBUG ("CSRF token contains invalid characters\n");
+						}
+					}
+					else
+					{
+						DEBUG ("CSRF token has invalid length: %zu\n", len);
 					}
 				}
 			}
@@ -253,7 +284,34 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 	return res;
 }
 
+char *
+smm_parse_csrf_token (const char *data, size_t len)
+{
+	char *token = NULL;
+	TidyBuffer docbuf = { 0 };
+	TidyDoc tdoc = tidyCreate ();
 
+	if (tdoc == NULL)
+	{
+		return NULL;
+	}
+
+	tidyOptSetBool (tdoc, TidyForceOutput, yes);
+	tidyOptSetInt (tdoc, TidyWrapLen, 4096);
+	tidyBufInit (&docbuf);
+	tidyBufAppend (&docbuf, (void *) data, len);
+
+	if (tidyParseBuffer (tdoc, &docbuf) >= 0)
+	{
+		tidyCleanAndRepair (tdoc);
+		extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &token);
+	}
+
+	tidyBufFree (&docbuf);
+	tidyRelease (tdoc);
+
+	return token;
+}
 
 bool
 smm_asset_connection_login (smm_connection connection)
@@ -261,9 +319,6 @@ smm_asset_connection_login (smm_connection connection)
 	bool res = false;
 	TidyBuffer docbuf = { 0 };
 
-	TidyDoc tdoc = tidyCreate ();
-	tidyOptSetBool (tdoc, TidyForceOutput, yes);
-	tidyOptSetInt (tdoc, TidyWrapLen, 4096);
 	tidyBufInit (&docbuf);
 
 	/* Get the login page, so we can get the csrf cookie + token */
@@ -271,11 +326,8 @@ smm_asset_connection_login (smm_connection connection)
 
 	if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
 	{
-		tidyParseBuffer (tdoc, &docbuf);
-		tidyCleanAndRepair (tdoc);
-
 		/* find the input token with the csrfmiddlewaretoken */
-		extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &connection->csrfmiddlewaretoken);
+		connection->csrfmiddlewaretoken = smm_parse_csrf_token ((const char *)docbuf.bp, docbuf.size);
 
 		if (connection->csrfmiddlewaretoken)
 		{
@@ -304,6 +356,11 @@ smm_asset_connection_login (smm_connection connection)
 			curl_free (esc_user);
 			curl_free (esc_pass);
 		}
+		else
+		{
+			DEBUG ("Failed to find CSRF token in login page\n");
+			connection->state = SMM_CONNECTION_PROTOCOL_ERROR;
+		}
 	}
 	else if (!res_get)
 	{
@@ -317,7 +374,6 @@ smm_asset_connection_login (smm_connection connection)
 	smm_curl_res_free (res_get);
 
 	tidyBufFree (&docbuf);
-	tidyRelease (tdoc);
 
 	return res;
 }
