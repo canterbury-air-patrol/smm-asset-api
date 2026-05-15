@@ -476,11 +476,81 @@ smm_waypoint_free (smm_waypoint waypoint)
 
 
 bool
+smm_parse_waypoints (const char *data, size_t len, smm_waypoints * waypoints, size_t * waypoints_count)
+{
+	json_error_t json_error;
+	bool res = false;
+
+	/* Parse the waypoints */
+	*waypoints_count = 0;
+	*waypoints = NULL;
+
+	json_t *json_root = json_loadb (data, len, 0, &json_error);
+	if (json_root)
+	{
+		json_t *json_features = json_object_get (json_root, "features");
+		if (json_is_array (json_features))
+		{
+			if (json_array_size (json_features) == 1)
+			{
+				json_t *json_search = json_array_get (json_features, 0);
+				json_t *json_geometry = json_object_get (json_search, "geometry");
+				json_t *json_coords = json_object_get (json_geometry, "coordinates");
+				if (json_is_array (json_coords))
+				{
+					size_t index = 0;
+					json_t *value = NULL;
+					json_array_foreach (json_coords, index, value)
+					{
+						double lat = 0.0;
+						double lon = 0.0;
+						json_t *json_lat = json_array_get (value, 1);
+						json_t *json_lon = json_array_get (value, 0);
+						lat = json_real_value (json_lat);
+						lon = json_real_value (json_lon);
+						smm_waypoint new_wp = smm_waypoint_create (lat, lon);
+						if (new_wp)
+						{
+							smm_waypoint *tmp = realloc (*waypoints, (*waypoints_count + 1) * sizeof (smm_waypoint));
+							if (tmp)
+							{
+								*waypoints = tmp;
+								(*waypoints)[*waypoints_count] = new_wp;
+								*waypoints_count += 1;
+							}
+							else
+							{
+								smm_waypoint_free (new_wp);
+							}
+						}
+					}
+					res = true;
+				}
+			}
+			else
+			{
+				DEBUG ("GeoJSON features array size != 1 (%zi)\n", json_array_size (json_features));
+			}
+		}
+		else
+		{
+			DEBUG ("Didn't find features array in GeoJSON\n");
+		}
+		json_decref (json_root);
+	}
+	else
+	{
+		DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
+	}
+
+	return res;
+}
+
+
+bool
 smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t * waypoints_count)
 {
 	struct buffer_s buf = { NULL, 0 };
-	json_t *json_root = NULL;
-	json_error_t json_error;
 
 	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf, true);
 
@@ -490,79 +560,17 @@ smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t *
 	}
 	else if (!(res->success && res->httpcode == HTTP_SUCCESS))
 	{
-		/* Login, try again */
 		smm_curl_res_free (res);
+		free (buf.data);
 		return false;
 	}
-
 	smm_curl_res_free (res);
 
-
-	/* Parse the assets */
-	*waypoints_count = 0;
-	*waypoints = NULL;
-
-	json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);
-	if (json_root)
-	{
-		json_t *json_features = json_object_get (json_root, "features");
-		if (json_features)
-		{
-			if (json_array_size (json_features) == 1)
-			{
-
-				printf ("Parsing waypoints\n");
-				size_t index = 0;
-				json_t *value = NULL;
-
-				json_t *json_search = json_array_get (json_features, 0);
-				if (json_search == NULL)
-				{
-					printf ("No json_search :(\n");
-				}
-				json_t *json_geometry = json_object_get (json_search, "geometry");
-				if (json_geometry == NULL)
-				{
-					printf ("No json_geometry \n");
-				}
-				json_t *json_coords = json_object_get (json_geometry, "coordinates");
-				if (json_coords == NULL)
-				{
-					printf ("No json_coords\n");
-				}
-				json_array_foreach (json_coords, index, value)
-				{
-					double lat = 0.0;
-					double lon = 0.0;
-					json_t *json_lat = json_array_get (value, 1);
-					json_t *json_lon = json_array_get (value, 0);
-					lat = json_real_value (json_lat);
-					lon = json_real_value (json_lon);
-					*(waypoints_count) += 1;
-					*waypoints = realloc (*waypoints, *waypoints_count * sizeof (smm_waypoint));
-					(*waypoints)[(*waypoints_count) - 1] = smm_waypoint_create (lat, lon);
-				}
-			}
-			else
-			{
-				printf ("array size != 1 (%zi)", json_array_size (json_features));
-			}
-		}
-		else
-		{
-			printf ("Didn't find waypoints\n");
-		}
-	}
-	else
-	{
-		printf ("Error on line %i: %s\n", json_error.line, json_error.text);
-	}
-
-	json_decref (json_root);
+	bool parse_res = smm_parse_waypoints (buf.data, buf.bytes, waypoints, waypoints_count);
 
 	free (buf.data);
 
-	return true;
+	return parse_res;
 }
 
 static bool

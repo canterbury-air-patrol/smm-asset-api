@@ -123,6 +123,24 @@ START_TEST(test_command_parsing_unknown)
 }
 END_TEST
 
+START_TEST(test_waypoint_parsing)
+{
+    const char *json = "{\"features\": [{\"geometry\": {\"coordinates\": [[172.6, -43.5], [172.7, -43.6]]}}]}";
+    smm_waypoints waypoints;
+    size_t count;
+    bool res = smm_parse_waypoints(json, strlen(json), &waypoints, &count);
+    
+    ck_assert_uint_eq(res, true);
+    ck_assert_uint_eq(count, 2);
+    ck_assert_ldouble_eq_tol(waypoints[0]->lat, -43.5, 0.0001);
+    ck_assert_ldouble_eq_tol(waypoints[0]->lon, 172.6, 0.0001);
+    ck_assert_ldouble_eq_tol(waypoints[1]->lat, -43.6, 0.0001);
+    ck_assert_ldouble_eq_tol(waypoints[1]->lon, 172.7, 0.0001);
+    
+    smm_waypoints_free(waypoints, count);
+}
+END_TEST
+
 Suite * smm_suite(void)
 {
     Suite *s;
@@ -148,6 +166,10 @@ Suite * smm_suite(void)
     tcase_add_test(tc_commands, test_command_parsing_rtl);
     tcase_add_test(tc_commands, test_command_parsing_unknown);
     suite_add_tcase(s, tc_commands);
+
+    TCase *tc_waypoints = tcase_create("Waypoints");
+    tcase_add_test(tc_waypoints, test_waypoint_parsing);
+    suite_add_tcase(s, tc_waypoints);
 
     return s;
 }
