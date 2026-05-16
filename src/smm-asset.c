@@ -170,6 +170,12 @@ smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_a
 								else
 									{
 										smm_asset_free_asset (new_asset);
+										smm_asset_free_assets (*assets,
+												       *assets_count);
+										*assets = NULL;
+										*assets_count = 0;
+										json_decref (json_root);
+										return false;
 									}
 							}
 					}
