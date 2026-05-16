@@ -497,52 +497,80 @@ smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, siz
 					if (json_array_size (json_features) == 1)
 						{
 							json_t *json_search = json_array_get (json_features, 0);
-							json_t *json_geometry
-							    = json_object_get (json_search, "geometry");
-							json_t *json_coords
-							    = json_object_get (json_geometry, "coordinates");
-							if (json_is_array (json_coords))
+							if (json_is_object (json_search))
 								{
-									size_t index = 0;
-									json_t *value = NULL;
-									json_array_foreach (json_coords, index, value)
-									{
-										double lat = 0.0;
-										double lon = 0.0;
-										json_t *json_lat
-										    = json_array_get (value, 1);
-										json_t *json_lon
-										    = json_array_get (value, 0);
-										lat = json_real_value (json_lat);
-										lon = json_real_value (json_lon);
-										smm_waypoint new_wp
-										    = smm_waypoint_create (lat, lon);
-										if (new_wp)
-											{
-												smm_waypoint *tmp = realloc (
-												    *waypoints,
-												    (*waypoints_count
-												     + 1)
-													* sizeof (
-													    smm_waypoint));
-												if (tmp)
+									json_t *json_geometry
+									    = json_object_get (json_search, "geometry");
+									if (json_is_object (json_geometry))
+										{
+											json_t *json_coords
+											    = json_object_get (
+												json_geometry,
+												"coordinates");
+											if (json_is_array (json_coords))
+												{
+													size_t index
+													    = 0;
+													json_t *value
+													    = NULL;
+													json_array_foreach (
+													    json_coords,
+													    index,
+													    value)
 													{
-														*waypoints
-														    = tmp;
-														(*waypoints)
-														    [*waypoints_count]
-														    = new_wp;
-														*waypoints_count
-														    += 1;
+														double
+														    lat
+														    = 0.0;
+														double
+														    lon
+														    = 0.0;
+														json_t *
+														    json_lat
+														    = json_array_get (
+															value,
+															1);
+														json_t *
+														    json_lon
+														    = json_array_get (
+															value,
+															0);
+														lat = json_real_value (
+														    json_lat);
+														lon = json_real_value (
+														    json_lon);
+														smm_waypoint
+														    new_wp
+														    = smm_waypoint_create (
+															lat,
+															lon);
+														if (new_wp)
+															{
+																smm_waypoint *tmp = realloc (
+																    *waypoints,
+																    (*waypoints_count
+																     + 1)
+																	* sizeof (
+																	    smm_waypoint));
+																if (tmp)
+																	{
+																		*waypoints
+																		    = tmp;
+																		(*waypoints)
+																		    [*waypoints_count]
+																		    = new_wp;
+																		*waypoints_count
+																		    += 1;
+																	}
+																else
+																	{
+																		smm_waypoint_free (
+																		    new_wp);
+																	}
+															}
 													}
-												else
-													{
-														smm_waypoint_free (
-														    new_wp);
-													}
-											}
-									}
-									res = true;
+													res = true;
+												}
+										}
 								}
 						}
 					else
