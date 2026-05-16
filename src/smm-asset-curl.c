@@ -177,9 +177,13 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 			case HTTP_SUCCESS:
 				{
 					char *ct = NULL;
-					if (curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &ct) == CURLE_OK)
+					if (curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &ct) == CURLE_OK && ct)
 						{
 							res->content_type = strdup (ct);
+							if (!res->content_type)
+								{
+									res->success = false;
+								}
 						}
 				}
 				break;
@@ -188,9 +192,14 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 			case HTTP_SEE_OTHER:
 				{
 					char *redirect_url = NULL;
-					if (curl_easy_getinfo (curl, CURLINFO_REDIRECT_URL, &redirect_url) == CURLE_OK)
+					if (curl_easy_getinfo (curl, CURLINFO_REDIRECT_URL, &redirect_url) == CURLE_OK
+					    && redirect_url)
 						{
 							res->redirect_url = strdup (redirect_url);
+							if (!res->redirect_url)
+								{
+									res->success = false;
+								}
 						}
 				}
 				break;
