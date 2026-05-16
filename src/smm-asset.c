@@ -55,6 +55,16 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
 	conn->user = strdup (user);
 	conn->pass = strdup (pass);
 	conn->verify_tls = true;
+
+	if (!conn->host || !conn->user || !conn->pass)
+		{
+			free (conn->host);
+			free (conn->user);
+			free (conn->pass);
+			free (conn);
+			return NULL;
+		}
+
 	pthread_mutex_init (&conn->lock, NULL);
 
 	return conn;
