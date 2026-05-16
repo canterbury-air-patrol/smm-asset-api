@@ -110,9 +110,23 @@ smm_asset
 smm_asset_create (smm_connection conn, const char *name, const char *type, long long asset_id, long long asset_type_id)
 {
 	smm_asset asset = calloc (1, sizeof (struct smm_asset_s));
+	if (asset == NULL)
+		{
+			return NULL;
+		}
+
 	asset->conn = conn;
 	asset->name = name ? strdup (name) : NULL;
 	asset->type = type ? strdup (type) : NULL;
+
+	if ((name && !asset->name) || (type && !asset->type))
+		{
+			free (asset->name);
+			free (asset->type);
+			free (asset);
+			return NULL;
+		}
+
 	asset->asset_id = asset_id;
 	asset->asset_type_id = asset_type_id;
 
