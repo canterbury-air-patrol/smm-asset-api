@@ -14,12 +14,18 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Install Deps
-      run: sudo apt update && sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev
+      run: sudo apt update && sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev check
     - name: autogen
       run: ./autogen.sh
     - name: configure
       run: ./configure
     - name: make
       run: make
+    - name: Start Docker SMM
+      run: |
+        docker compose -f tests/docker-compose.yml up -d
+        ./tests/provision.sh
+    - name: make check
+      run: make check
     - name: make distcheck
       run: make distcheck

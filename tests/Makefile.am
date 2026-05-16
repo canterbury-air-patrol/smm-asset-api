@@ -7,3 +7,5 @@ check_smm_LDADD = $(top_builddir)/src/libsmmasset.la @CHECK_LIBS@
 integration_test_SOURCES = integration_test.c $(top_builddir)/src/smm-asset.h
 integration_test_CFLAGS = -I$(top_srcdir)/src
 integration_test_LDADD = $(top_builddir)/src/libsmmasset.la
+
+EXTRA_DIST = docker-compose.yml provision.sh
