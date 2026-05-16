@@ -108,6 +108,11 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		}
 
 	res = (struct smm_curl_res_s *)calloc (1, sizeof (struct smm_curl_res_s));
+	if (res == NULL)
+		{
+			pthread_mutex_unlock (&conn->lock);
+			return NULL;
+		}
 
 	if (asprintf (&res->full_uri, "%s%s", conn->host, path) < 0)
 		{
