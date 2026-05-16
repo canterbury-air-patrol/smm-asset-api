@@ -1,7 +1,9 @@
 #include "smm-asset-internal.h"
 #include "smm-asset.h"
 #include <check.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 START_TEST (test_csrf_extraction)
 {
