@@ -299,6 +299,11 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 													*token
 													    = strdup (
 														value);
+													if (*token
+													    == NULL)
+														{
+															return false;
+														}
 													return true;
 												}
 											else
