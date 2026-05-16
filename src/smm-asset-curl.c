@@ -389,28 +389,32 @@ smm_asset_connection_login (smm_connection connection)
 					char *esc_user = curl_easy_escape (connection->curl, connection->user, 0);
 					char *esc_pass = curl_easy_escape (connection->curl, connection->pass, 0);
 
-					if (esc_csrf && esc_user && esc_pass
-					    && asprintf (&post_data, "csrfmiddlewaretoken=%s&username=%s&password=%s",
-							 esc_csrf, esc_user, esc_pass)
-						   >= 0)
+					if (esc_csrf && esc_user && esc_pass)
 						{
-							struct smm_curl_res_s *res_post
-							    = smm_connection_curl_retrieve_url (
-								connection, "/accounts/login/", post_data, NULL, NULL,
-								false);
-							if (res_post && res_post->success
-							    && res_post->httpcode == HTTP_FOUND)
+							if (asprintf (&post_data,
+								      "csrfmiddlewaretoken=%s&username=%s&password=%s",
+								      esc_csrf, esc_user, esc_pass)
+							    >= 0)
 								{
-									res = true;
-									connection->state = SMM_CONNECTION_CONNECTED;
+									struct smm_curl_res_s *res_post
+									    = smm_connection_curl_retrieve_url (
+										connection, "/accounts/login/",
+										post_data, NULL, NULL, false);
+									if (res_post && res_post->success
+									    && res_post->httpcode == HTTP_FOUND)
+										{
+											res = true;
+											connection->state
+											    = SMM_CONNECTION_CONNECTED;
+										}
+									else
+										{
+											connection->state
+											    = SMM_CONNECTION_AUTHENTICATION_FAILURE;
+										}
+									smm_curl_res_free (res_post);
+									free (post_data);
 								}
-							else
-								{
-									connection->state
-									    = SMM_CONNECTION_AUTHENTICATION_FAILURE;
-								}
-							smm_curl_res_free (res_post);
-							free (post_data);
 						}
 					curl_free (esc_csrf);
 					curl_free (esc_user);
