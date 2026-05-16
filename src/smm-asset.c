@@ -509,6 +509,10 @@ static smm_waypoint
 smm_waypoint_create (double lat, double lon)
 {
 	smm_waypoint wp = calloc (1, sizeof (struct smm_waypoint_s));
+	if (wp == NULL)
+		{
+			return NULL;
+		}
 	wp->lat = lat;
 	wp->lon = lon;
 	return wp;
