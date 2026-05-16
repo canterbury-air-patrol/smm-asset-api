@@ -444,8 +444,20 @@ static smm_search
 smm_search_create (smm_asset asset, const char *url, uint64_t length, uint64_t distance, uint64_t sweep_width)
 {
 	smm_search search = calloc (1, sizeof (struct smm_search_s));
+	if (search == NULL)
+		{
+			return NULL;
+		}
+
 	search->asset = asset;
 	search->url = url ? strdup (url) : NULL;
+
+	if (url && !search->url)
+		{
+			free (search);
+			return NULL;
+		}
+
 	search->length = length;
 	search->distance = distance;
 	search->sweep_width = sweep_width;
