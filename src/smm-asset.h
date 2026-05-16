@@ -65,13 +65,13 @@ typedef struct smm_waypoint_s **smm_waypoints;
  */
 typedef enum
 {
-	SMM_CONNECTION_UNKNOWN,	/*!< Unknown state or invalid object */
-	SMM_CONNECTION_CONNECTED,	/*!< Currently connected */
-	SMM_CONNECTION_HOST_INVALID,	/*!< Host URL invalid, i.e. not http(s):// or not a valid domain */
-	SMM_CONNECTION_NO_HOST_CONNECTION,	/*!< Unable to connect to host */
-	SMM_CONNECTION_AUTHENTICATION_FAILURE,	/*!< Unable to authenticate with host */
-	SMM_CONNECTION_PROTOCOL_ERROR,	/*!< Unexpected response from host */
-	SMM_CONNECTION_FAILURE,	/*!< Unable to communicate, for another reason */
+	SMM_CONNECTION_UNKNOWN,		       /*!< Unknown state or invalid object */
+	SMM_CONNECTION_CONNECTED,	       /*!< Currently connected */
+	SMM_CONNECTION_HOST_INVALID,	       /*!< Host URL invalid, i.e. not http(s):// or not a valid domain */
+	SMM_CONNECTION_NO_HOST_CONNECTION,     /*!< Unable to connect to host */
+	SMM_CONNECTION_AUTHENTICATION_FAILURE, /*!< Unable to authenticate with host */
+	SMM_CONNECTION_PROTOCOL_ERROR,	       /*!< Unexpected response from host */
+	SMM_CONNECTION_FAILURE,		       /*!< Unable to communicate, for another reason */
 } smm_connection_status;
 
 /**
@@ -79,14 +79,14 @@ typedef enum
  */
 typedef enum
 {
-	SMM_COMMAND_NONE,	/*!< No restriction on current operation */
-	SMM_COMMAND_CIRCLE,	/*!< Circle/Hold at current position */
-	SMM_COMMAND_RTL,	/*!< Return to launch site */
-	SMM_COMMAND_GOTO,	/*!< Goto to the specified position */
-	SMM_COMMAND_CONTINUE,	/*!< Previous command revoked, resume own navigation */
-	SMM_COMMAND_ABANDON_SEARCH, /*!< Abandon the current search, expect reassignment */
+	SMM_COMMAND_NONE,	      /*!< No restriction on current operation */
+	SMM_COMMAND_CIRCLE,	      /*!< Circle/Hold at current position */
+	SMM_COMMAND_RTL,	      /*!< Return to launch site */
+	SMM_COMMAND_GOTO,	      /*!< Goto to the specified position */
+	SMM_COMMAND_CONTINUE,	      /*!< Previous command revoked, resume own navigation */
+	SMM_COMMAND_ABANDON_SEARCH,   /*!< Abandon the current search, expect reassignment */
 	SMM_COMMAND_MISSION_COMPLETE, /*!< The mission has concluded, return to base */
-	SMM_COMMAND_UNKNOWN,	/*!< The command from the server is not known */
+	SMM_COMMAND_UNKNOWN,	      /*!< The command from the server is not known */
 } smm_asset_command;
 
 /**
@@ -142,7 +142,7 @@ void smm_connection_close (smm_connection connection);
  *
  * @return true if assets were successfully retrieved (even if there are none), false if there was an error
  */
-bool smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * assets_count);
+bool smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *assets_count);
 
 /**
  * Free a set of assets
@@ -182,7 +182,8 @@ const char *smm_asset_type (smm_asset asset);
  *
  * @return true if the position was reported to the server
  */
-bool smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t bearing, uint8_t fix);
+bool smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude,
+				uint16_t bearing, uint8_t fix);
 
 /**
  * Get the last command we saw from the server
@@ -213,7 +214,8 @@ bool smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon);
  * @param latitude the current latitude of the asset in degrees
  * @param longitude the current longitude of the asset in degrees
  *
- * @return the closest or next queued search for this asset type, it will need to be accepted with @ref smm_search_accept before searching begins
+ * @return the closest or next queued search for this asset type, it will need to be accepted with @ref
+ * smm_search_accept before searching begins
  */
 smm_search smm_asset_get_search (smm_asset asset, double latitude, double longitude);
 
@@ -254,7 +256,7 @@ uint64_t smm_search_sweep_width (smm_search search);
  *
  * @return true if waypoints for the search were stored in waypoints
  */
-bool smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t * waypoints_count);
+bool smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *waypoints_count);
 
 /**
  * Accept a search
@@ -263,7 +265,8 @@ bool smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, siz
  *
  * @param search the search to accept
  *
- * @return true if the server accepted this search begining, otherwise @ref smm_search_destory the search and @ref smm_asset_get_search again
+ * @return true if the server accepted this search begining, otherwise @ref smm_search_destory the search and @ref
+ * smm_asset_get_search again
  */
 bool smm_search_accept (smm_search search);
 

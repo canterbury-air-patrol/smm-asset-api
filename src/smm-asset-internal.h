@@ -30,14 +30,15 @@
 #include <curl/curl.h>
 
 extern bool smm_debug;
-#define DEBUG(...) do \
-	{ \
-		if (smm_debug) \
-		{ \
-			printf ("%s:%i ", __func__, __LINE__);\
-			printf(__VA_ARGS__); \
-		} \
-	} \
+#define DEBUG(...)                                                                                                     \
+	do                                                                                                             \
+		{                                                                                                      \
+			if (smm_debug)                                                                                 \
+				{                                                                                      \
+					printf ("%s:%i ", __func__, __LINE__);                                         \
+					printf (__VA_ARGS__);                                                          \
+				}                                                                                      \
+		}                                                                                                      \
 	while (0)
 
 struct smm_connection_s
@@ -92,12 +93,16 @@ size_t to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata);
 
 void smm_curl_res_free (struct smm_curl_res_s *);
 struct smm_curl_res_s *smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
-							 size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data, bool json);
+							 size_t (*write_func) (char *ptr, size_t size, size_t nmemb,
+									       void *userdata),
+							 void *write_data, bool json);
 bool smm_asset_connection_login (smm_connection connection);
 char *smm_parse_csrf_token (const char *data, size_t len);
-bool smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets * assets, size_t * assets_count);
-bool smm_parse_command (const char *data, size_t len, smm_asset_command * command, double *lat, double *lon);
-bool smm_parse_waypoints (const char *data, size_t len, smm_waypoints * waypoints, size_t * waypoints_count);
+bool smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets *assets,
+		       size_t *assets_count);
+bool smm_parse_command (const char *data, size_t len, smm_asset_command *command, double *lat, double *lon);
+bool smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, size_t *waypoints_count);
 
-smm_asset smm_asset_create (smm_connection connection, const char *name, const char *type, long long asset_id, long long asset_type_id);
+smm_asset smm_asset_create (smm_connection connection, const char *name, const char *type, long long asset_id,
+			    long long asset_type_id);
 void smm_asset_free_asset (smm_asset assets);

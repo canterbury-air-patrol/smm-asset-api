@@ -29,7 +29,8 @@
 
 #include <jansson.h>
 
-enum http_return_codes {
+enum http_return_codes
+{
 	HTTP_SUCCESS = 200,
 };
 
@@ -46,9 +47,9 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
 {
 	smm_connection conn = calloc (1, sizeof (struct smm_connection_s));
 	if (conn == NULL)
-	{
-		return NULL;
-	}
+		{
+			return NULL;
+		}
 
 	conn->host = strdup (host);
 	conn->user = strdup (user);
@@ -63,9 +64,9 @@ smm_connection_status
 smm_asset_connection_get_state (smm_connection connection)
 {
 	if (connection == NULL)
-	{
-		return SMM_CONNECTION_UNKNOWN;
-	}
+		{
+			return SMM_CONNECTION_UNKNOWN;
+		}
 	return connection->state;
 }
 
@@ -73,25 +74,25 @@ void
 smm_asset_connection_tls_verify_set (smm_connection connection, bool verify)
 {
 	if (connection != NULL)
-	{
-		pthread_mutex_lock (&connection->lock);
-		connection->verify_tls = verify;
-		pthread_mutex_unlock (&connection->lock);
-	}
+		{
+			pthread_mutex_lock (&connection->lock);
+			connection->verify_tls = verify;
+			pthread_mutex_unlock (&connection->lock);
+		}
 }
 
 void
 smm_connection_close (smm_connection connection)
 {
 	if (connection != NULL)
-	{
-		free (connection->host);
-		free (connection->user);
-		free (connection->pass);
-		free (connection->csrfmiddlewaretoken);
-		curl_easy_cleanup (connection->curl);
-		pthread_mutex_destroy(&connection->lock);
-	}
+		{
+			free (connection->host);
+			free (connection->user);
+			free (connection->pass);
+			free (connection->csrfmiddlewaretoken);
+			curl_easy_cleanup (connection->curl);
+			pthread_mutex_destroy (&connection->lock);
+		}
 	free (connection);
 }
 
@@ -109,7 +110,7 @@ smm_asset_create (smm_connection conn, const char *name, const char *type, long 
 }
 
 bool
-smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets * assets, size_t * assets_count)
+smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets *assets, size_t *assets_count)
 {
 	json_error_t json_error;
 	bool res = false;
@@ -120,88 +121,91 @@ smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_a
 
 	json_t *json_root = json_loadb (data, len, 0, &json_error);
 	if (json_root)
-	{
-		json_t *json_assets = json_object_get (json_root, "assets");
-		if (json_is_array (json_assets))
 		{
-			size_t index = 0;
-			json_t *value = NULL;
+			json_t *json_assets = json_object_get (json_root, "assets");
+			if (json_is_array (json_assets))
+				{
+					size_t index = 0;
+					json_t *value = NULL;
 
-			json_array_foreach (json_assets, index, value)
-			{
-				const char *key = NULL;
-				json_t *val = NULL;
-				json_int_t asset_id = -1;
-				json_int_t asset_type_id = -1;
-				const char *name = NULL;
-				const char *type = NULL;
-				json_object_foreach (value, key, val)
-				{
-					if (strcmp (key, "id") == 0)
+					json_array_foreach (json_assets, index, value)
 					{
-						asset_id = json_integer_value (val);
+						const char *key = NULL;
+						json_t *val = NULL;
+						json_int_t asset_id = -1;
+						json_int_t asset_type_id = -1;
+						const char *name = NULL;
+						const char *type = NULL;
+						json_object_foreach (value, key, val)
+						{
+							if (strcmp (key, "id") == 0)
+								{
+									asset_id = json_integer_value (val);
+								}
+							else if (strcmp (key, "type_id") == 0)
+								{
+									asset_type_id = json_integer_value (val);
+								}
+							else if (strcmp (key, "name") == 0)
+								{
+									name = json_string_value (val);
+								}
+							else if (strcmp (key, "type_name") == 0)
+								{
+									type = json_string_value (val);
+								}
+						}
+						smm_asset new_asset = smm_asset_create (connection, name, type,
+											asset_id, asset_type_id);
+						if (new_asset)
+							{
+								smm_asset *tmp = realloc (
+								    *assets, (*assets_count + 1) * sizeof (smm_asset));
+								if (tmp)
+									{
+										*assets = tmp;
+										(*assets)[*assets_count] = new_asset;
+										*assets_count += 1;
+									}
+								else
+									{
+										smm_asset_free_asset (new_asset);
+									}
+							}
 					}
-					else if (strcmp (key, "type_id") == 0)
-					{
-						asset_type_id = json_integer_value (val);
-					}
-					else if (strcmp (key, "name") == 0)
-					{
-						name = json_string_value (val);
-					}
-					else if (strcmp (key, "type_name") == 0)
-					{
-						type = json_string_value (val);
-					}
+					res = true;
 				}
-				smm_asset new_asset = smm_asset_create (connection, name, type, asset_id, asset_type_id);
-				if (new_asset)
+			else
 				{
-					smm_asset *tmp = realloc (*assets, (*assets_count + 1) * sizeof (smm_asset));
-					if (tmp)
-					{
-						*assets = tmp;
-						(*assets)[*assets_count] = new_asset;
-						*assets_count += 1;
-					}
-					else
-					{
-						smm_asset_free_asset (new_asset);
-					}
+					DEBUG ("Didn't find assets array in JSON\n");
 				}
-			}
-			res = true;
+			json_decref (json_root);
 		}
-		else
-		{
-			DEBUG ("Didn't find assets array in JSON\n");
-		}
-		json_decref (json_root);
-	}
 	else
-	{
-		DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
-	}
+		{
+			DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
+		}
 
 	return res;
 }
 
 bool
-smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * assets_count)
+smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *assets_count)
 {
 	struct buffer_s buf = { NULL, 0 };
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
+	struct smm_curl_res_s *res
+	    = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
 	if (res == NULL)
-	{
-		return false;
-	}
+		{
+			return false;
+		}
 	if (!(res->success && res->httpcode == HTTP_SUCCESS))
-	{
-		smm_curl_res_free (res);
-		free (buf.data);
-		return false;
-	}
+		{
+			smm_curl_res_free (res);
+			free (buf.data);
+			return false;
+		}
 	smm_curl_res_free (res);
 
 	bool parse_res = smm_parse_assets (connection, buf.data, buf.bytes, assets, assets_count);
@@ -209,7 +213,6 @@ smm_asset_get_assets (smm_connection connection, smm_assets * assets, size_t * a
 	free (buf.data);
 	return parse_res;
 }
-
 
 void
 smm_asset_free_asset (smm_asset asset)
@@ -223,9 +226,9 @@ void
 smm_asset_free_assets (smm_assets assets, size_t assets_count)
 {
 	for (size_t i = 0; i < assets_count; i++)
-	{
-		smm_asset_free_asset (assets[i]);
-	}
+		{
+			smm_asset_free_asset (assets[i]);
+		}
 	free (assets);
 }
 
@@ -239,9 +242,9 @@ const char *
 smm_asset_name (smm_asset asset)
 {
 	if (asset)
-	{
-		return asset->name;
-	}
+		{
+			return asset->name;
+		}
 	return NULL;
 }
 
@@ -249,14 +252,14 @@ const char *
 smm_asset_type (smm_asset asset)
 {
 	if (asset)
-	{
-		return asset->type;
-	}
+		{
+			return asset->type;
+		}
 	return NULL;
 }
 
 bool
-smm_parse_command (const char *data, size_t len, smm_asset_command * command, double *lat, double *lon)
+smm_parse_command (const char *data, size_t len, smm_asset_command *command, double *lat, double *lon)
 {
 	json_error_t json_error;
 	bool res = false;
@@ -265,62 +268,62 @@ smm_parse_command (const char *data, size_t len, smm_asset_command * command, do
 
 	json_t *json_root = json_loadb (data, len, 0, &json_error);
 	if (json_root)
-	{
-		json_t *tmp = json_object_get (json_root, "action");
-		if (json_is_string (tmp))
 		{
-			const char *cmd_str = json_string_value (tmp);
-			if (cmd_str)
-			{
-				res = true;
-				if (strcmp (cmd_str, "GOTO") == 0)
+			json_t *tmp = json_object_get (json_root, "action");
+			if (json_is_string (tmp))
 				{
-					/* Get lat and long as well */
-					tmp = json_object_get (json_root, "latitude");
-					if (json_is_real (tmp))
-					{
-						*lat = json_real_value (tmp);
-					}
-					tmp = json_object_get (json_root, "longitude");
-					if (json_is_real (tmp))
-					{
-						*lon = json_real_value (tmp);
-					}
-					*command = SMM_COMMAND_GOTO;
+					const char *cmd_str = json_string_value (tmp);
+					if (cmd_str)
+						{
+							res = true;
+							if (strcmp (cmd_str, "GOTO") == 0)
+								{
+									/* Get lat and long as well */
+									tmp = json_object_get (json_root, "latitude");
+									if (json_is_real (tmp))
+										{
+											*lat = json_real_value (tmp);
+										}
+									tmp = json_object_get (json_root, "longitude");
+									if (json_is_real (tmp))
+										{
+											*lon = json_real_value (tmp);
+										}
+									*command = SMM_COMMAND_GOTO;
+								}
+							else if (strcmp (cmd_str, "RON") == 0)
+								{
+									*command = SMM_COMMAND_CONTINUE;
+								}
+							else if (strcmp (cmd_str, "RTL") == 0)
+								{
+									*command = SMM_COMMAND_RTL;
+								}
+							else if (strcmp (cmd_str, "CIR") == 0)
+								{
+									*command = SMM_COMMAND_CIRCLE;
+								}
+							else if (strcmp (cmd_str, "AS") == 0)
+								{
+									*command = SMM_COMMAND_ABANDON_SEARCH;
+								}
+							else if (strcmp (cmd_str, "MC") == 0)
+								{
+									*command = SMM_COMMAND_MISSION_COMPLETE;
+								}
+							else
+								{
+									*command = SMM_COMMAND_UNKNOWN;
+								}
+						}
 				}
-				else if (strcmp (cmd_str, "RON") == 0)
-				{
-					*command = SMM_COMMAND_CONTINUE;
-				}
-				else if (strcmp (cmd_str, "RTL") == 0)
-				{
-					*command = SMM_COMMAND_RTL;
-				}
-				else if (strcmp (cmd_str, "CIR") == 0)
-				{
-					*command = SMM_COMMAND_CIRCLE;
-				}
-				else if (strcmp (cmd_str, "AS") == 0)
-				{
-					*command = SMM_COMMAND_ABANDON_SEARCH;
-				}
-				else if (strcmp (cmd_str, "MC") == 0)
-				{
-					*command = SMM_COMMAND_MISSION_COMPLETE;
-				}
-				else
-				{
-					*command = SMM_COMMAND_UNKNOWN;
-				}
-			}
-		}
 
-		json_decref (json_root);
-	}
+			json_decref (json_root);
+		}
 	else
-	{
-		DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
-	}
+		{
+			DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
+		}
 
 	return res;
 }
@@ -328,9 +331,9 @@ smm_parse_command (const char *data, size_t len, smm_asset_command * command, do
 static bool
 smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
 {
-	return smm_parse_command (buf->data, buf->bytes, &asset->last_command, &asset->last_command_lat, &asset->last_command_lon);
+	return smm_parse_command (buf->data, buf->bytes, &asset->last_command, &asset->last_command_lat,
+				  &asset->last_command_lon);
 }
-
 
 smm_asset_command
 smm_asset_last_command (smm_asset asset)
@@ -342,62 +345,63 @@ bool
 smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon)
 {
 	if (asset->last_command != SMM_COMMAND_GOTO)
-	{
-		return false;
-	}
+		{
+			return false;
+		}
 	if (lat == NULL || lon == NULL)
-	{
-		return false;
-	}
+		{
+			return false;
+		}
 	*lat = asset->last_command_lat;
 	*lon = asset->last_command_lon;
 	return true;
 }
 
-
 bool
-smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t bearing, uint8_t fix)
+smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t bearing,
+			   uint8_t fix)
 {
 	struct buffer_s buf = { NULL, 0 };
 
 	char *page = NULL;
-	if (asprintf (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&bearing=%u&fix=%u", asset->asset_id, latitude, longitude, altitude, bearing, fix)
+	if (asprintf (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&bearing=%u&fix=%u",
+		      asset->asset_id, latitude, longitude, altitude, bearing, fix)
 	    < 0)
-	{
-		return false;
-	}
+		{
+			return false;
+		}
 
 	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
 	if (res == NULL)
-	{
-		free (page);
-		return false;
-	}
+		{
+			free (page);
+			return false;
+		}
 	if (!(res->success && res->httpcode == HTTP_SUCCESS))
-	{
-		smm_curl_res_free (res);
-		free (page);
-		return false;
-	}
+		{
+			smm_curl_res_free (res);
+			free (page);
+			return false;
+		}
 
 	free (page);
 
 	/* if json data was returned, update the current action */
 	if (res->content_type != NULL && strcmp (res->content_type, "application/json") == 0)
-	{
-		smm_asset_update_command (asset, &buf);
-	}
+		{
+			smm_asset_update_command (asset, &buf);
+		}
 	else
-	{
-		if (buf.data && strncmp (buf.data, "Continue", buf.bytes) == 0)
 		{
-			asset->last_command = SMM_COMMAND_CONTINUE;
+			if (buf.data && strncmp (buf.data, "Continue", buf.bytes) == 0)
+				{
+					asset->last_command = SMM_COMMAND_CONTINUE;
+				}
+			else
+				{
+					asset->last_command = SMM_COMMAND_NONE;
+				}
 		}
-		else
-		{
-			asset->last_command = SMM_COMMAND_NONE;
-		}
-	}
 
 	free (buf.data);
 
@@ -423,9 +427,9 @@ uint64_t
 smm_search_distance (smm_search search)
 {
 	if (search)
-	{
-		return search->distance;
-	}
+		{
+			return search->distance;
+		}
 	return 0;
 }
 
@@ -433,19 +437,19 @@ uint64_t
 smm_search_length (smm_search search)
 {
 	if (search)
-	{
-		return search->length;
-	}
+		{
+			return search->length;
+		}
 	return 0;
 }
 
 uint64_t
-smm_search_sweep_width(smm_search search)
+smm_search_sweep_width (smm_search search)
 {
 	if (search)
-	{
-		return search->sweep_width;
-	}
+		{
+			return search->sweep_width;
+		}
 	return 0;
 }
 
@@ -453,10 +457,10 @@ void
 smm_search_destroy (smm_search search)
 {
 	if (search)
-	{
-		free (search->url);
-		free (search);
-	}
+		{
+			free (search->url);
+			free (search);
+		}
 }
 
 static smm_waypoint
@@ -474,9 +478,8 @@ smm_waypoint_free (smm_waypoint waypoint)
 	free (waypoint);
 }
 
-
 bool
-smm_parse_waypoints (const char *data, size_t len, smm_waypoints * waypoints, size_t * waypoints_count)
+smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, size_t *waypoints_count)
 {
 	json_error_t json_error;
 	bool res = false;
@@ -487,83 +490,99 @@ smm_parse_waypoints (const char *data, size_t len, smm_waypoints * waypoints, si
 
 	json_t *json_root = json_loadb (data, len, 0, &json_error);
 	if (json_root)
-	{
-		json_t *json_features = json_object_get (json_root, "features");
-		if (json_is_array (json_features))
 		{
-			if (json_array_size (json_features) == 1)
-			{
-				json_t *json_search = json_array_get (json_features, 0);
-				json_t *json_geometry = json_object_get (json_search, "geometry");
-				json_t *json_coords = json_object_get (json_geometry, "coordinates");
-				if (json_is_array (json_coords))
+			json_t *json_features = json_object_get (json_root, "features");
+			if (json_is_array (json_features))
 				{
-					size_t index = 0;
-					json_t *value = NULL;
-					json_array_foreach (json_coords, index, value)
-					{
-						double lat = 0.0;
-						double lon = 0.0;
-						json_t *json_lat = json_array_get (value, 1);
-						json_t *json_lon = json_array_get (value, 0);
-						lat = json_real_value (json_lat);
-						lon = json_real_value (json_lon);
-						smm_waypoint new_wp = smm_waypoint_create (lat, lon);
-						if (new_wp)
+					if (json_array_size (json_features) == 1)
 						{
-							smm_waypoint *tmp = realloc (*waypoints, (*waypoints_count + 1) * sizeof (smm_waypoint));
-							if (tmp)
-							{
-								*waypoints = tmp;
-								(*waypoints)[*waypoints_count] = new_wp;
-								*waypoints_count += 1;
-							}
-							else
-							{
-								smm_waypoint_free (new_wp);
-							}
+							json_t *json_search = json_array_get (json_features, 0);
+							json_t *json_geometry
+							    = json_object_get (json_search, "geometry");
+							json_t *json_coords
+							    = json_object_get (json_geometry, "coordinates");
+							if (json_is_array (json_coords))
+								{
+									size_t index = 0;
+									json_t *value = NULL;
+									json_array_foreach (json_coords, index, value)
+									{
+										double lat = 0.0;
+										double lon = 0.0;
+										json_t *json_lat
+										    = json_array_get (value, 1);
+										json_t *json_lon
+										    = json_array_get (value, 0);
+										lat = json_real_value (json_lat);
+										lon = json_real_value (json_lon);
+										smm_waypoint new_wp
+										    = smm_waypoint_create (lat, lon);
+										if (new_wp)
+											{
+												smm_waypoint *tmp = realloc (
+												    *waypoints,
+												    (*waypoints_count
+												     + 1)
+													* sizeof (
+													    smm_waypoint));
+												if (tmp)
+													{
+														*waypoints
+														    = tmp;
+														(*waypoints)
+														    [*waypoints_count]
+														    = new_wp;
+														*waypoints_count
+														    += 1;
+													}
+												else
+													{
+														smm_waypoint_free (
+														    new_wp);
+													}
+											}
+									}
+									res = true;
+								}
 						}
-					}
-					res = true;
+					else
+						{
+							DEBUG ("GeoJSON features array size != 1 (%zi)\n",
+							       json_array_size (json_features));
+						}
 				}
-			}
 			else
-			{
-				DEBUG ("GeoJSON features array size != 1 (%zi)\n", json_array_size (json_features));
-			}
+				{
+					DEBUG ("Didn't find features array in GeoJSON\n");
+				}
+			json_decref (json_root);
 		}
-		else
-		{
-			DEBUG ("Didn't find features array in GeoJSON\n");
-		}
-		json_decref (json_root);
-	}
 	else
-	{
-		DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
-	}
+		{
+			DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
+		}
 
 	return res;
 }
 
-
 bool
-smm_search_get_waypoints (smm_search search, smm_waypoints * waypoints, size_t * waypoints_count)
+smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *waypoints_count)
 {
 	struct buffer_s buf = { NULL, 0 };
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf, true);
+	struct smm_curl_res_s *res
+	    = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf, true);
 
 	if (res == NULL)
-	{
-		return false;
-	}
+		{
+			return false;
+		}
 	else if (!(res->success && res->httpcode == HTTP_SUCCESS))
-	{
-		smm_curl_res_free (res);
-		free (buf.data);
-		return false;
-	}
+		{
+			smm_curl_res_free (res);
+			free (buf.data);
+			return false;
+		}
 	smm_curl_res_free (res);
 
 	bool parse_res = smm_parse_waypoints (buf.data, buf.bytes, waypoints, waypoints_count);
@@ -579,25 +598,27 @@ smm_search_action (smm_search search, const char *action)
 	char *action_page = NULL;
 	struct buffer_s buf = { NULL, 0 };
 
-	if (asprintf (&action_page, "%s%s/?asset_id=%lli", search->url, action, smm_asset_get_asset_id (search->asset)) < 0)
-	{
-		return false;
-	}
+	if (asprintf (&action_page, "%s%s/?asset_id=%lli", search->url, action, smm_asset_get_asset_id (search->asset))
+	    < 0)
+		{
+			return false;
+		}
 	if (action_page == NULL)
-	{
-		return false;
-	}
+		{
+			return false;
+		}
 
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->asset->conn, action_page, NULL, to_buffer, &buf, false);
+	struct smm_curl_res_s *res
+	    = smm_connection_curl_retrieve_url (search->asset->conn, action_page, NULL, to_buffer, &buf, false);
 	if (res == NULL)
-	{
-		return false;
-	}
+		{
+			return false;
+		}
 	else if (!(res->success && res->httpcode == HTTP_SUCCESS))
-	{
-		smm_curl_res_free (res);
-		return false;
-	}
+		{
+			smm_curl_res_free (res);
+			return false;
+		}
 
 	smm_curl_res_free (res);
 	free (action_page);
@@ -624,9 +645,9 @@ void
 smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count)
 {
 	for (size_t i = 0; i < waypoints_count; i++)
-	{
-		smm_waypoint_free (waypoints[i]);
-	}
+		{
+			smm_waypoint_free (waypoints[i]);
+		}
 	free (waypoints);
 }
 
@@ -637,62 +658,64 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 	struct buffer_s buf = { NULL, 0 };
 
 	char *page = NULL;
-	if (asprintf (&page, "/search/find/closest/?asset_id=%lli&latitude=%lf&longitude=%lf", asset->asset_id, latitude, longitude) < 0)
-	{
-		return NULL;
-	}
+	if (asprintf (&page, "/search/find/closest/?asset_id=%lli&latitude=%lf&longitude=%lf", asset->asset_id,
+		      latitude, longitude)
+	    < 0)
+		{
+			return NULL;
+		}
 
 	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
 	if (res == NULL)
-	{
-		free (page);
-		return false;
-	}
+		{
+			free (page);
+			return false;
+		}
 	if (!(res->success && res->httpcode == HTTP_SUCCESS))
-	{
-		/* login and try again */
-		smm_curl_res_free (res);
-		free (page);
-		return false;
-	}
+		{
+			/* login and try again */
+			smm_curl_res_free (res);
+			free (page);
+			return false;
+		}
 	free (page);
 
 	if (res->content_type != NULL && strcmp (res->content_type, "application/json") == 0)
-	{
-		json_t *json_root = NULL;
-		json_error_t json_error;
-
-		json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);
-		if (json_root)
 		{
-			const char *url = NULL;
-			uint64_t distance = 0;
-			uint64_t length = 0;
-			uint64_t sweep_width = 0;
-			json_t *tmp = json_object_get (json_root, "object_url");
-			if (tmp)
-			{
-				url = json_string_value (tmp);
-			}
-			tmp = json_object_get (json_root, "distance");
-			if (tmp)
-			{
-				distance = json_integer_value (tmp);
-			}
-			tmp = json_object_get (json_root, "length");
-			if (tmp)
-			{
-				length = json_integer_value (tmp);
-			}
-			tmp = json_object_get (json_root, "sweep_width");
-			if (tmp)
-			{
-				sweep_width = json_integer_value (tmp);
-			}
-			search = smm_search_create (asset, url, length, distance, sweep_width);
-			json_decref (json_root);
+			json_t *json_root = NULL;
+			json_error_t json_error;
+
+			json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);
+			if (json_root)
+				{
+					const char *url = NULL;
+					uint64_t distance = 0;
+					uint64_t length = 0;
+					uint64_t sweep_width = 0;
+					json_t *tmp = json_object_get (json_root, "object_url");
+					if (tmp)
+						{
+							url = json_string_value (tmp);
+						}
+					tmp = json_object_get (json_root, "distance");
+					if (tmp)
+						{
+							distance = json_integer_value (tmp);
+						}
+					tmp = json_object_get (json_root, "length");
+					if (tmp)
+						{
+							length = json_integer_value (tmp);
+						}
+					tmp = json_object_get (json_root, "sweep_width");
+					if (tmp)
+						{
+							sweep_width = json_integer_value (tmp);
+						}
+					search = smm_search_create (asset, url, length, distance, sweep_width);
+					json_decref (json_root);
+				}
 		}
-	}
 	smm_curl_res_free (res);
 	free (buf.data);
 	return search;

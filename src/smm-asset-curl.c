@@ -21,8 +21,8 @@
  */
 #include "config.h"
 
-#include "smm-asset.h"
 #include "smm-asset-internal.h"
+#include "smm-asset.h"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -38,7 +38,8 @@
 #error No tidy header(s)
 #endif
 
-enum http_return_codes {
+enum http_return_codes
+{
 	HTTP_SUCCESS = 200,
 	HTTP_MOVED_PERMANENTLY = 301,
 	HTTP_FOUND = 302,
@@ -49,12 +50,12 @@ void
 smm_curl_res_free (struct smm_curl_res_s *res)
 {
 	if (res)
-	{
-		free (res->full_uri);
-		free (res->redirect_url);
-		free (res->content_type);
-		free (res);
-	}
+		{
+			free (res->full_uri);
+			free (res->redirect_url);
+			free (res->content_type);
+			free (res);
+		}
 }
 
 static size_t
@@ -67,12 +68,12 @@ size_t
 to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 {
 	size_t new_bytes = size * nmemb;
-	struct buffer_s *buf = (struct buffer_s *) userdata;
+	struct buffer_s *buf = (struct buffer_s *)userdata;
 	char *tmp = realloc (buf->data, buf->bytes + new_bytes + 1);
 	if (tmp == NULL)
-	{
-		return 0;
-	}
+		{
+			return 0;
+		}
 	buf->data = tmp;
 	memcpy (&buf->data[buf->bytes], ptr, new_bytes);
 	buf->bytes += new_bytes;
@@ -83,37 +84,38 @@ to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 
 static struct smm_curl_res_s *
 smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const char *post_data,
-				   size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data, bool json)
+				    size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata),
+				    void *write_data, bool json)
 {
 	struct smm_curl_res_s *res = NULL;
 
-	DEBUG ("(%p, %s, %s, %p)\n", (void *) conn, path, post_data, write_data);
+	DEBUG ("(%p, %s, %s, %p)\n", (void *)conn, path, post_data, write_data);
 
 	if (conn == NULL || path == NULL)
-	{
-		DEBUG ("conn or path is NULL\n");
-		return NULL;
-	}
+		{
+			DEBUG ("conn or path is NULL\n");
+			return NULL;
+		}
 
 	pthread_mutex_lock (&conn->lock);
 	CURL *curl = conn->curl;
 	bool verify_tls = conn->verify_tls;
 	if (curl == NULL)
-	{
-		DEBUG ("creating curl object\n");
-		curl = curl_easy_init ();
-		conn->curl = curl;
-	}
+		{
+			DEBUG ("creating curl object\n");
+			curl = curl_easy_init ();
+			conn->curl = curl;
+		}
 
-	res = (struct smm_curl_res_s *) calloc (1, sizeof (struct smm_curl_res_s));
+	res = (struct smm_curl_res_s *)calloc (1, sizeof (struct smm_curl_res_s));
 
 	if (asprintf (&res->full_uri, "%s%s", conn->host, path) < 0)
-	{
-		free (res);
-		DEBUG ("failed to allocate full_uri");
-		pthread_mutex_unlock (&conn->lock);
-		return NULL;
-	}
+		{
+			free (res);
+			DEBUG ("failed to allocate full_uri");
+			pthread_mutex_unlock (&conn->lock);
+			return NULL;
+		}
 
 	curl_easy_setopt (curl, CURLOPT_FAILONERROR, true);
 	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, verify_tls ? 1L : 0L);
@@ -123,36 +125,36 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 	curl_easy_setopt (curl, CURLOPT_URL, res->full_uri);
 
 	if (post_data)
-	{
-		curl_easy_setopt (curl, CURLOPT_REFERER, res->full_uri);
-		curl_easy_setopt (curl, CURLOPT_POSTFIELDS, post_data);
-		curl_easy_setopt (curl, CURLOPT_POST, 1);
-	}
+		{
+			curl_easy_setopt (curl, CURLOPT_REFERER, res->full_uri);
+			curl_easy_setopt (curl, CURLOPT_POSTFIELDS, post_data);
+			curl_easy_setopt (curl, CURLOPT_POST, 1);
+		}
 	else
-	{
-		curl_easy_setopt (curl, CURLOPT_REFERER, NULL);
-		curl_easy_setopt (curl, CURLOPT_POSTFIELDS, NULL);
-		curl_easy_setopt (curl, CURLOPT_POST, 0);
-	}
+		{
+			curl_easy_setopt (curl, CURLOPT_REFERER, NULL);
+			curl_easy_setopt (curl, CURLOPT_POSTFIELDS, NULL);
+			curl_easy_setopt (curl, CURLOPT_POST, 0);
+		}
 
 	if (write_func)
-	{
-		curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, write_func);
-		curl_easy_setopt (curl, CURLOPT_WRITEDATA, write_data);
-	}
+		{
+			curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, write_func);
+			curl_easy_setopt (curl, CURLOPT_WRITEDATA, write_data);
+		}
 	else
-	{
-		curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, eat_data);
-		curl_easy_setopt (curl, CURLOPT_WRITEDATA, NULL);
-	}
+		{
+			curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, eat_data);
+			curl_easy_setopt (curl, CURLOPT_WRITEDATA, NULL);
+		}
 
 	struct curl_slist *headers = NULL;
 
 	if (json)
-	{
-		headers = curl_slist_append (headers, "Accept: application/json");
-		curl_easy_setopt (curl, CURLOPT_HTTPHEADER, headers);
-	}
+		{
+			headers = curl_slist_append (headers, "Accept: application/json");
+			curl_easy_setopt (curl, CURLOPT_HTTPHEADER, headers);
+		}
 
 	DEBUG ("fetching %s\n", res->full_uri);
 	CURLcode cres = curl_easy_perform (curl);
@@ -166,28 +168,28 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 	curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &res->httpcode);
 	DEBUG ("httpcode = %li\n", res->httpcode);
 	switch (res->httpcode)
-	{
-		case HTTP_SUCCESS:
 		{
-			char *ct = NULL;
-			if (curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &ct) == CURLE_OK)
-			{
-				res->content_type = strdup (ct);
-			}
+			case HTTP_SUCCESS:
+				{
+					char *ct = NULL;
+					if (curl_easy_getinfo (curl, CURLINFO_CONTENT_TYPE, &ct) == CURLE_OK)
+						{
+							res->content_type = strdup (ct);
+						}
+				}
+				break;
+			case HTTP_MOVED_PERMANENTLY:
+			case HTTP_FOUND:
+			case HTTP_SEE_OTHER:
+				{
+					char *redirect_url = NULL;
+					if (curl_easy_getinfo (curl, CURLINFO_REDIRECT_URL, &redirect_url) == CURLE_OK)
+						{
+							res->redirect_url = strdup (redirect_url);
+						}
+				}
+				break;
 		}
-			break;
-		case HTTP_MOVED_PERMANENTLY:
-		case HTTP_FOUND:
-		case HTTP_SEE_OTHER:
-		{
-			char *redirect_url = NULL;
-			if (curl_easy_getinfo (curl, CURLINFO_REDIRECT_URL, &redirect_url) == CURLE_OK)
-			{
-				res->redirect_url = strdup (redirect_url);
-			}
-		}
-			break;
-	}
 
 	/* Clear anything we set in the curl object */
 	curl_easy_setopt (curl, CURLOPT_URL, NULL);
@@ -197,7 +199,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 	curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, NULL);
 	curl_easy_setopt (curl, CURLOPT_WRITEDATA, NULL);
 
-	pthread_mutex_unlock(&conn->lock);
+	pthread_mutex_unlock (&conn->lock);
 
 	DEBUG ("Done\n");
 
@@ -207,7 +209,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 static size_t
 populate_tidy (char *ptr, size_t size, size_t nmemb, void *userdata)
 {
-	tidyBufAppend ((TidyBuffer *) userdata, ptr, size * nmemb);
+	tidyBufAppend ((TidyBuffer *)userdata, ptr, size * nmemb);
 	return size * nmemb;
 }
 
@@ -216,71 +218,101 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
 {
 	bool res = false;
 	for (TidyNode child = tidyGetChild (tnod); child; child = tidyGetNext (child))
-	{
-		ctmbstr name = tidyNodeGetName (child);
-		if (name)
 		{
-			if (strcmp (name, "input") == 0)
-			{
-				bool is_csrf = false;
-				ctmbstr value = NULL;
-				/* check the attributes */
-				for (TidyAttr attr = tidyAttrFirst (child); attr; attr = tidyAttrNext (attr))
+			ctmbstr name = tidyNodeGetName (child);
+			if (name)
 				{
-					ctmbstr attrName = tidyAttrName (attr);
-					if (strcmp (attrName, "name") == 0)
-					{
-						if (strcmp (tidyAttrValue (attr), "csrfmiddlewaretoken") == 0)
+					if (strcmp (name, "input") == 0)
 						{
-							is_csrf = true;
+							bool is_csrf = false;
+							ctmbstr value = NULL;
+							/* check the attributes */
+							for (TidyAttr attr = tidyAttrFirst (child); attr;
+							     attr = tidyAttrNext (attr))
+								{
+									ctmbstr attrName = tidyAttrName (attr);
+									if (strcmp (attrName, "name") == 0)
+										{
+											if (strcmp (
+												tidyAttrValue (attr),
+												"csrfmiddlewaretoken")
+											    == 0)
+												{
+													is_csrf = true;
+												}
+										}
+									else if (strcmp (attrName, "value") == 0)
+										{
+											value = tidyAttrValue (attr);
+										}
+								}
+							if (is_csrf && value)
+								{
+									size_t len = strlen (value);
+									if (len > 0 && len < 256)
+										{
+											/* Validate token characters:
+											 * [A-Za-z0-9_\-] */
+											bool valid = true;
+											for (size_t i = 0; i < len; i++)
+												{
+													if (!((value[i]
+														   >= 'a'
+													       && value[i]
+														      <= 'z')
+													      || (value[i]
+														      >= 'A'
+														  && value[i]
+															 <= 'Z')
+													      || (value[i]
+														      >= '0'
+														  && value[i]
+															 <= '9')
+													      || (value
+														      [i]
+														  == '_')
+													      || (value
+														      [i]
+														  == '-')))
+														{
+															valid
+															    = false;
+															break;
+														}
+												}
+											if (valid)
+												{
+													*token
+													    = strdup (
+														value);
+													return true;
+												}
+											else
+												{
+													DEBUG (
+													    "CSRF "
+													    "token "
+													    "contains "
+													    "invalid "
+													    "characters"
+													    "\n");
+												}
+										}
+									else
+										{
+											DEBUG ("CSRF token has invalid "
+											       "length: %zu\n",
+											       len);
+										}
+								}
 						}
-					}
-					else if (strcmp (attrName, "value") == 0)
-					{
-						value = tidyAttrValue (attr);
-					}
 				}
-				if (is_csrf && value)
+			res = extract_csrfmiddlewaretoken (tdoc, child, token);
+			if (res)
 				{
-					size_t len = strlen (value);
-					if (len > 0 && len < 256)
-					{
-						/* Validate token characters: [A-Za-z0-9_\-] */
-						bool valid = true;
-						for (size_t i = 0; i < len; i++)
-						{
-							if (!((value[i] >= 'a' && value[i] <= 'z') ||
-							      (value[i] >= 'A' && value[i] <= 'Z') ||
-							      (value[i] >= '0' && value[i] <= '9') ||
-							      (value[i] == '_') || (value[i] == '-')))
-							{
-								valid = false;
-								break;
-							}
-						}
-						if (valid)
-						{
-							*token = strdup (value);
-							return true;
-						}
-						else
-						{
-							DEBUG ("CSRF token contains invalid characters\n");
-						}
-					}
-					else
-					{
-						DEBUG ("CSRF token has invalid length: %zu\n", len);
-					}
+					return res;
 				}
-			}
 		}
-		res = extract_csrfmiddlewaretoken (tdoc, child, token);
-		if (res)
-		{
-			return res;
-		}
-	}
 	return res;
 }
 
@@ -292,20 +324,20 @@ smm_parse_csrf_token (const char *data, size_t len)
 	TidyDoc tdoc = tidyCreate ();
 
 	if (tdoc == NULL)
-	{
-		return NULL;
-	}
+		{
+			return NULL;
+		}
 
 	tidyOptSetBool (tdoc, TidyForceOutput, yes);
 	tidyOptSetInt (tdoc, TidyWrapLen, 4096);
 	tidyBufInit (&docbuf);
-	tidyBufAppend (&docbuf, (void *) data, len);
+	tidyBufAppend (&docbuf, (void *)data, len);
 
 	if (tidyParseBuffer (tdoc, &docbuf) >= 0)
-	{
-		tidyCleanAndRepair (tdoc);
-		extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &token);
-	}
+		{
+			tidyCleanAndRepair (tdoc);
+			extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &token);
+		}
 
 	tidyBufFree (&docbuf);
 	tidyRelease (tdoc);
@@ -322,55 +354,65 @@ smm_asset_connection_login (smm_connection connection)
 	tidyBufInit (&docbuf);
 
 	/* Get the login page, so we can get the csrf cookie + token */
-	struct smm_curl_res_s *res_get = smm_connection_curl_retrieve_url (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
+	struct smm_curl_res_s *res_get
+	    = smm_connection_curl_retrieve_url (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
 
 	if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
-	{
-		/* find the input token with the csrfmiddlewaretoken */
-		connection->csrfmiddlewaretoken = smm_parse_csrf_token ((const char *)docbuf.bp, docbuf.size);
-
-		if (connection->csrfmiddlewaretoken)
 		{
-			char *post_data = NULL;
-			char *esc_csrf = curl_easy_escape (connection->curl, connection->csrfmiddlewaretoken, 0);
-			char *esc_user = curl_easy_escape (connection->curl, connection->user, 0);
-			char *esc_pass = curl_easy_escape (connection->curl, connection->pass, 0);
+			/* find the input token with the csrfmiddlewaretoken */
+			connection->csrfmiddlewaretoken = smm_parse_csrf_token ((const char *)docbuf.bp, docbuf.size);
 
-			if (esc_csrf && esc_user && esc_pass && asprintf
-			    (&post_data, "csrfmiddlewaretoken=%s&username=%s&password=%s", esc_csrf, esc_user, esc_pass) >= 0)
-			{
-				struct smm_curl_res_s *res_post = smm_connection_curl_retrieve_url (connection, "/accounts/login/", post_data, NULL, NULL, false);
-				if (res_post && res_post->success && res_post->httpcode == HTTP_FOUND)
+			if (connection->csrfmiddlewaretoken)
 				{
-					res = true;
-					connection->state = SMM_CONNECTION_CONNECTED;
+					char *post_data = NULL;
+					char *esc_csrf
+					    = curl_easy_escape (connection->curl, connection->csrfmiddlewaretoken, 0);
+					char *esc_user = curl_easy_escape (connection->curl, connection->user, 0);
+					char *esc_pass = curl_easy_escape (connection->curl, connection->pass, 0);
+
+					if (esc_csrf && esc_user && esc_pass
+					    && asprintf (&post_data, "csrfmiddlewaretoken=%s&username=%s&password=%s",
+							 esc_csrf, esc_user, esc_pass)
+						   >= 0)
+						{
+							struct smm_curl_res_s *res_post
+							    = smm_connection_curl_retrieve_url (
+								connection, "/accounts/login/", post_data, NULL, NULL,
+								false);
+							if (res_post && res_post->success
+							    && res_post->httpcode == HTTP_FOUND)
+								{
+									res = true;
+									connection->state = SMM_CONNECTION_CONNECTED;
+								}
+							else
+								{
+									connection->state
+									    = SMM_CONNECTION_AUTHENTICATION_FAILURE;
+								}
+							smm_curl_res_free (res_post);
+							free (post_data);
+						}
+					curl_free (esc_csrf);
+					curl_free (esc_user);
+					curl_free (esc_pass);
 				}
-				else
+			else
 				{
-					connection->state = SMM_CONNECTION_AUTHENTICATION_FAILURE;
+					DEBUG ("Failed to find CSRF token in login page\n");
+					connection->state = SMM_CONNECTION_PROTOCOL_ERROR;
 				}
-				smm_curl_res_free (res_post);
-				free (post_data);
-			}
-			curl_free (esc_csrf);
-			curl_free (esc_user);
-			curl_free (esc_pass);
 		}
-		else
-		{
-			DEBUG ("Failed to find CSRF token in login page\n");
-			connection->state = SMM_CONNECTION_PROTOCOL_ERROR;
-		}
-	}
 	else if (!res_get)
-	{
-		DEBUG ("No res object returned\n");
-		connection->state = SMM_CONNECTION_NO_HOST_CONNECTION;
-	}
+		{
+			DEBUG ("No res object returned\n");
+			connection->state = SMM_CONNECTION_NO_HOST_CONNECTION;
+		}
 	else
-	{
-		DEBUG ("success = %s, httpcode = %li\n", res_get->success ? "true" : "false", res_get->httpcode);
-	}
+		{
+			DEBUG ("success = %s, httpcode = %li\n", res_get->success ? "true" : "false",
+			       res_get->httpcode);
+		}
 	smm_curl_res_free (res_get);
 
 	tidyBufFree (&docbuf);
@@ -380,67 +422,77 @@ smm_asset_connection_login (smm_connection connection)
 
 struct smm_curl_res_s *
 smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
-				  size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata), void *write_data, bool json)
+				  size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata),
+				  void *write_data, bool json)
 {
 	bool retry = true;
 	int retries = 0;
-	struct smm_curl_res_s *res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data, json);
+	struct smm_curl_res_s *res
+	    = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data, json);
 
 	while (retry && retries < 3 && res != NULL)
-	{
-		retry = false;
-		retries++;
-		if (res->success && res->httpcode == HTTP_FOUND && res->redirect_url)
 		{
-			DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
-			/* It's possible we need to upgrade to https */
-			if (strncmp (conn->host, "https://", 8) != 0 && strncmp (res->redirect_url, "https://", 8) == 0)
-			{
-				/* Upgrade to https */
-				DEBUG ("Upgrading to https\n");
-				char *new_host = NULL;
-				if (strncmp (conn->host, "http://", 7) == 0)
+			retry = false;
+			retries++;
+			if (res->success && res->httpcode == HTTP_FOUND && res->redirect_url)
 				{
-					if (asprintf (&new_host, "https://%s", &conn->host[7]) < 0)
-					{
-						DEBUG ("Failed to create new host\n");
-					}
-				}
-				else
-				{
-					if (asprintf (&new_host, "https://%s", conn->host) < 0)
-					{
-						DEBUG ("Failed to create new host\n");
-					}
-				}
-				if (new_host)
-				{
-					free (conn->host);
-					conn->host = new_host;
-					retry = true;
-				}
-			}
+					DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
+					/* It's possible we need to upgrade to https */
+					if (strncmp (conn->host, "https://", 8) != 0
+					    && strncmp (res->redirect_url, "https://", 8) == 0)
+						{
+							/* Upgrade to https */
+							DEBUG ("Upgrading to https\n");
+							char *new_host = NULL;
+							if (strncmp (conn->host, "http://", 7) == 0)
+								{
+									if (asprintf (&new_host, "https://%s",
+										      &conn->host[7])
+									    < 0)
+										{
+											DEBUG ("Failed to create new "
+											       "host\n");
+										}
+								}
+							else
+								{
+									if (asprintf (&new_host, "https://%s",
+										      conn->host)
+									    < 0)
+										{
+											DEBUG ("Failed to create new "
+											       "host\n");
+										}
+								}
+							if (new_host)
+								{
+									free (conn->host);
+									conn->host = new_host;
+									retry = true;
+								}
+						}
 
-			if (!retry && strstr (res->redirect_url, "accounts/login") != NULL)
-			{
-				DEBUG ("Login required\n");
-				if (smm_asset_connection_login (conn))
-				{
-					retry = true;
-				}
-			}
+					if (!retry && strstr (res->redirect_url, "accounts/login") != NULL)
+						{
+							DEBUG ("Login required\n");
+							if (smm_asset_connection_login (conn))
+								{
+									retry = true;
+								}
+						}
 
-			if (!retry)
-			{
-				DEBUG ("Redirected to %s\n", res->redirect_url);
-			}
+					if (!retry)
+						{
+							DEBUG ("Redirected to %s\n", res->redirect_url);
+						}
+				}
+			if (retry && retries < 3)
+				{
+					smm_curl_res_free (res);
+					res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func,
+										  write_data, json);
+				}
 		}
-		if (retry && retries < 3)
-		{
-			smm_curl_res_free (res);
-			res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data, json);
-		}
-	}
 
 	return res;
 }
