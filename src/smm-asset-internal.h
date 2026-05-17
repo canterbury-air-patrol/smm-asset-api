@@ -63,6 +63,7 @@ struct smm_asset_s
 	smm_asset_command last_command;
 	double last_command_lat;
 	double last_command_lon;
+	pthread_mutex_t lock;
 };
 
 struct smm_search_s
