@@ -23,9 +23,9 @@ jobs:
       run: make
     - name: Start Docker SMM
       run: |
-        docker compose -f tests/docker-compose.yml up -d
+        docker compose -f tests/docker-compose.yml up -d smm db
         ./tests/provision.sh
-    - name: make check
-      run: make check
+    - name: Run Tests in Docker
+      run: docker compose -f tests/docker-compose.yml run tester
     - name: make distcheck
       run: make distcheck

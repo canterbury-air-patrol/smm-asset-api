@@ -1,8 +1,6 @@
 services:
   smm:
     image: canterburyairpatrol/search-management-map:latest
-    ports:
-      - "8000:8080"
     environment:
       - DB_HOST=db
       - DB_USER=smm
@@ -14,6 +12,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  tester:
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile.tester
+    environment:
+      - SMM_HOST=http://smm:8080
+      - SMM_USER=testuser
+      - SMM_PASS=testpass
+    depends_on:
+      - smm
 
   db:
     image: postgis/postgis:18-3.6

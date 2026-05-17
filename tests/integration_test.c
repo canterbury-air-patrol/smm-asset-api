@@ -32,7 +32,7 @@ main (void)
 	conn = smm_asset_connect (host, user, pass);
 	if (!conn)
 		{
-			fprintf (stderr, "Failed to create connection object\n");
+			fprintf (stderr, "No server available at %s, skipping\n", host);
 			return 1;
 		}
 
