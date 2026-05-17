@@ -611,6 +611,16 @@ smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, siz
 																	{
 																		smm_waypoint_free (
 																		    new_wp);
+																		smm_waypoints_free (
+																		    *waypoints,
+																		    *waypoints_count);
+																		*waypoints
+																		    = NULL;
+																		*waypoints_count
+																		    = 0;
+																		json_decref (
+																		    json_root);
+																		return false;
 																	}
 															}
 													}
