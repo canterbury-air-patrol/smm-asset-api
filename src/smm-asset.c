@@ -224,6 +224,14 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
 {
 	struct buffer_s buf = { NULL, 0 };
 
+	if (assets == NULL || assets_count == NULL)
+		{
+			return false;
+		}
+
+	*assets = NULL;
+	*assets_count = 0;
+
 	struct smm_curl_res_s *res
 	    = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
 	if (res == NULL)
@@ -654,6 +662,14 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
 {
 	struct buffer_s buf = { NULL, 0 };
 
+	if (waypoints == NULL || waypoints_count == NULL)
+		{
+			return false;
+		}
+
+	*waypoints = NULL;
+	*waypoints_count = 0;
+
 	struct smm_curl_res_s *res
 	    = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf, true);
 
@@ -753,14 +769,15 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 	if (res == NULL)
 		{
 			free (page);
-			return false;
+			return NULL;
 		}
 	if (!(res->success && res->httpcode == HTTP_SUCCESS))
 		{
 			/* login and try again */
 			smm_curl_res_free (res);
 			free (page);
-			return false;
+			free (buf.data);
+			return NULL;
 		}
 	free (page);
 
@@ -798,6 +815,10 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 						}
 					search = smm_search_create (asset, url, length, distance, sweep_width);
 					json_decref (json_root);
+				}
+			else
+				{
+					DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
 				}
 		}
 	smm_curl_res_free (res);
