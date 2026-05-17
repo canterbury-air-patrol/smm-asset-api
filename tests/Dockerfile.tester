@@ -1,0 +1,21 @@
+FROM debian:trixie
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    libcurl4-openssl-dev \
+    libtidy-dev \
+    libjansson-dev \
+    check \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+
+RUN ./autogen.sh && ./configure && make
+
+CMD ["make", "check"]
