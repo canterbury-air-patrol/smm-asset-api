@@ -131,6 +131,8 @@ smm_asset_create (smm_connection conn, const char *name, const char *type, long 
 	asset->asset_id = asset_id;
 	asset->asset_type_id = asset_type_id;
 
+	pthread_mutex_init (&asset->lock, NULL);
+
 	return asset;
 }
 
@@ -256,9 +258,13 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
 void
 smm_asset_free_asset (smm_asset asset)
 {
-	free (asset->name);
-	free (asset->type);
-	free (asset);
+	if (asset)
+		{
+			free (asset->name);
+			free (asset->type);
+			pthread_mutex_destroy (&asset->lock);
+			free (asset);
+		}
 }
 
 void
@@ -370,30 +376,40 @@ smm_parse_command (const char *data, size_t len, smm_asset_command *command, dou
 static bool
 smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
 {
-	return smm_parse_command (buf->data, buf->bytes, &asset->last_command, &asset->last_command_lat,
-				  &asset->last_command_lon);
+	bool res;
+	pthread_mutex_lock (&asset->lock);
+	res = smm_parse_command (buf->data, buf->bytes, &asset->last_command, &asset->last_command_lat,
+				 &asset->last_command_lon);
+	pthread_mutex_unlock (&asset->lock);
+	return res;
 }
 
 smm_asset_command
 smm_asset_last_command (smm_asset asset)
 {
-	return asset->last_command;
+	smm_asset_command cmd;
+	pthread_mutex_lock (&asset->lock);
+	cmd = asset->last_command;
+	pthread_mutex_unlock (&asset->lock);
+	return cmd;
 }
 
 bool
 smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon)
 {
-	if (asset->last_command != SMM_COMMAND_GOTO)
+	bool res = false;
+	pthread_mutex_lock (&asset->lock);
+	if (asset->last_command == SMM_COMMAND_GOTO)
 		{
-			return false;
+			if (lat != NULL && lon != NULL)
+				{
+					*lat = asset->last_command_lat;
+					*lon = asset->last_command_lon;
+					res = true;
+				}
 		}
-	if (lat == NULL || lon == NULL)
-		{
-			return false;
-		}
-	*lat = asset->last_command_lat;
-	*lon = asset->last_command_lon;
-	return true;
+	pthread_mutex_unlock (&asset->lock);
+	return res;
 }
 
 bool
