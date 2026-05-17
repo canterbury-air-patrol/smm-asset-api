@@ -46,6 +46,51 @@ enum http_return_codes
 	HTTP_SEE_OTHER = 303,
 };
 
+static void
+smm_curl_lock (CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr)
+{
+	(void)handle;
+	(void)data;
+	(void)access;
+	pthread_mutex_t *lock = (pthread_mutex_t *)userptr;
+	pthread_mutex_lock (lock);
+}
+
+static void
+smm_curl_unlock (CURL *handle, curl_lock_data data, void *userptr)
+{
+	(void)handle;
+	(void)data;
+	pthread_mutex_t *lock = (pthread_mutex_t *)userptr;
+	pthread_mutex_unlock (lock);
+}
+
+void
+smm_connection_share_init (smm_connection conn)
+{
+	if (conn->share == NULL)
+		{
+			CURLSH *share = curl_share_init ();
+			curl_share_setopt (share, CURLSHOPT_LOCKFUNC, smm_curl_lock);
+			curl_share_setopt (share, CURLSHOPT_UNLOCKFUNC, smm_curl_unlock);
+			curl_share_setopt (share, CURLSHOPT_USERDATA, &conn->lock);
+			curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE);
+			curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+			curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
+			conn->share = share;
+		}
+}
+
+void
+smm_connection_share_destroy (smm_connection conn)
+{
+	if (conn->share != NULL)
+		{
+			curl_share_cleanup (conn->share);
+			conn->share = NULL;
+		}
+}
+
 void
 smm_curl_res_free (struct smm_curl_res_s *res)
 {
@@ -88,6 +133,10 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 				    void *write_data, bool json)
 {
 	struct smm_curl_res_s *res = NULL;
+	CURL *curl = NULL;
+	char *host = NULL;
+	bool verify_tls = true;
+	CURLSH *share = NULL;
 
 	DEBUG ("(%p, %s, %s, %p)\n", (void *)conn, path, post_data, write_data);
 
@@ -98,30 +147,44 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		}
 
 	pthread_mutex_lock (&conn->lock);
-	CURL *curl = conn->curl;
-	bool verify_tls = conn->verify_tls;
-	if (curl == NULL)
+	if (conn->host)
 		{
-			DEBUG ("creating curl object\n");
-			curl = curl_easy_init ();
-			conn->curl = curl;
+			host = strdup (conn->host);
+		}
+	verify_tls = conn->verify_tls;
+	share = conn->share;
+	pthread_mutex_unlock (&conn->lock);
+
+	if (host == NULL)
+		{
+			return NULL;
 		}
 
 	res = (struct smm_curl_res_s *)calloc (1, sizeof (struct smm_curl_res_s));
 	if (res == NULL)
 		{
-			pthread_mutex_unlock (&conn->lock);
+			free (host);
 			return NULL;
 		}
 
-	if (asprintf (&res->full_uri, "%s%s", conn->host, path) < 0)
+	if (asprintf (&res->full_uri, "%s%s", host, path) < 0)
 		{
+			free (host);
 			free (res);
 			DEBUG ("failed to allocate full_uri");
-			pthread_mutex_unlock (&conn->lock);
+			return NULL;
+		}
+	free (host);
+
+	curl = curl_easy_init ();
+	if (curl == NULL)
+		{
+			free (res->full_uri);
+			free (res);
 			return NULL;
 		}
 
+	curl_easy_setopt (curl, CURLOPT_SHARE, share);
 	curl_easy_setopt (curl, CURLOPT_FAILONERROR, true);
 	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, verify_tls ? 1L : 0L);
 	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, verify_tls ? 2L : 0L);
@@ -166,10 +229,6 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 	DEBUG ("curl returned %i\n", cres);
 	res->success = (cres == CURLE_OK);
 
-	curl_easy_setopt (curl, CURLOPT_HTTPHEADER, NULL);
-	curl_slist_free_all (headers);
-	headers = NULL;
-
 	curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &res->httpcode);
 	DEBUG ("httpcode = %li\n", res->httpcode);
 	switch (res->httpcode)
@@ -205,15 +264,8 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 				break;
 		}
 
-	/* Clear anything we set in the curl object */
-	curl_easy_setopt (curl, CURLOPT_URL, NULL);
-	curl_easy_setopt (curl, CURLOPT_REFERER, NULL);
-	curl_easy_setopt (curl, CURLOPT_POSTFIELDS, NULL);
-	curl_easy_setopt (curl, CURLOPT_POST, 0);
-	curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, NULL);
-	curl_easy_setopt (curl, CURLOPT_WRITEDATA, NULL);
-
-	pthread_mutex_unlock (&conn->lock);
+	curl_slist_free_all (headers);
+	curl_easy_cleanup (curl);
 
 	DEBUG ("Done\n");
 
@@ -384,10 +436,9 @@ smm_asset_connection_login (smm_connection connection)
 			if (connection->csrfmiddlewaretoken)
 				{
 					char *post_data = NULL;
-					char *esc_csrf
-					    = curl_easy_escape (connection->curl, connection->csrfmiddlewaretoken, 0);
-					char *esc_user = curl_easy_escape (connection->curl, connection->user, 0);
-					char *esc_pass = curl_easy_escape (connection->curl, connection->pass, 0);
+					char *esc_csrf = curl_easy_escape (NULL, connection->csrfmiddlewaretoken, 0);
+					char *esc_user = curl_easy_escape (NULL, connection->user, 0);
+					char *esc_pass = curl_easy_escape (NULL, connection->pass, 0);
 
 					if (esc_csrf && esc_user && esc_pass)
 						{

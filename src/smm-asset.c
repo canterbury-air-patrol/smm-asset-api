@@ -66,6 +66,7 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
 		}
 
 	pthread_mutex_init (&conn->lock, NULL);
+	smm_connection_share_init (conn);
 
 	return conn;
 }
@@ -100,7 +101,7 @@ smm_connection_close (smm_connection connection)
 			free (connection->user);
 			free (connection->pass);
 			free (connection->csrfmiddlewaretoken);
-			curl_easy_cleanup (connection->curl);
+			smm_connection_share_destroy (connection);
 			pthread_mutex_destroy (&connection->lock);
 		}
 	free (connection);
