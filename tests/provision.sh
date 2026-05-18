@@ -2,7 +2,7 @@
 set -e
 
 echo "Waiting for SMM to be ready..."
-until docker compose -f tests/docker-compose.yml exec -T smm curl -s http://localhost:8080/accounts/login/ > /dev/null; do
+until docker compose -f tests/docker-compose.yml ps smm | grep -q "healthy"; do
   sleep 2
 done
 

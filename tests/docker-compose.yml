@@ -12,6 +12,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/accounts/login/')\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   tester:
     build:
@@ -22,7 +28,8 @@ services:
       - SMM_USER=testuser
       - SMM_PASS=testpass
     depends_on:
-      - smm
+      smm:
+        condition: service_healthy
 
   db:
     image: postgis/postgis:18-3.6
