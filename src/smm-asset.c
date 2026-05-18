@@ -67,7 +67,25 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
 		}
 
 	pthread_mutex_init (&conn->lock, NULL);
-	smm_connection_share_init (conn);
+	if (!smm_connection_share_init (conn))
+		{
+			conn->state = SMM_CONNECTION_FAILURE;
+		}
+
+	/* Early host validation */
+	CURLU *curlu = curl_url ();
+	if (curlu)
+		{
+			if (curl_url_set (curlu, CURLUPART_URL, host, 0) != CURLUE_OK)
+				{
+					conn->state = SMM_CONNECTION_HOST_INVALID;
+				}
+			curl_url_cleanup (curlu);
+		}
+	else
+		{
+			conn->state = SMM_CONNECTION_FAILURE;
+		}
 
 	return conn;
 }
