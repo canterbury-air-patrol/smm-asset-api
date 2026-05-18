@@ -93,7 +93,7 @@ struct buffer_s
 
 size_t to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata);
 
-void smm_connection_share_init (smm_connection conn);
+bool smm_connection_share_init (smm_connection conn);
 void smm_connection_share_destroy (smm_connection conn);
 
 void smm_connection_unref (smm_connection conn);

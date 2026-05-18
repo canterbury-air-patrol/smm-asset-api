@@ -148,13 +148,27 @@ START_TEST (test_waypoint_parsing)
 }
 END_TEST
 
+START_TEST (test_invalid_host)
+{
+	smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
+	ck_assert_ptr_nonnull (conn);
+	ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
+	smm_connection_close (conn);
+}
+END_TEST
+
 Suite *
 smm_suite (void)
 {
 	Suite *s;
 	TCase *tc_csrf;
+	TCase *tc_conn;
 
 	s = suite_create ("SMM");
+
+	tc_conn = tcase_create ("Connection");
+	tcase_add_test (tc_conn, test_invalid_host);
+	suite_add_tcase (s, tc_conn);
 
 	tc_csrf = tcase_create ("CSRF");
 	tcase_add_test (tc_csrf, test_csrf_extraction);

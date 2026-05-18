@@ -108,27 +108,28 @@ smm_build_login_post_data (const char *csrf, const char *user, const char *pass,
 	return ok;
 }
 
-void
+bool
 smm_connection_share_init (smm_connection conn)
 {
 	if (conn->share != NULL)
 		{
-			return;
+			return true;
 		}
 
 	CURLSH *share = curl_share_init ();
 	if (share == NULL)
 		{
-			return;
+			return false;
 		}
 
 	if (!smm_connection_share_configure (share, &conn->lock))
 		{
 			curl_share_cleanup (share);
-			return;
+			return false;
 		}
 
 	conn->share = share;
+	return true;
 }
 
 void
@@ -265,6 +266,25 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 	CURLcode cres = curl_easy_perform (curl);
 	DEBUG ("curl returned %i\n", cres);
 	res->success = (cres == CURLE_OK);
+
+	if (cres != CURLE_OK)
+		{
+			pthread_mutex_lock (&conn->lock);
+			switch (cres)
+				{
+					case CURLE_URL_MALFORMAT:
+						conn->state = SMM_CONNECTION_HOST_INVALID;
+						break;
+					case CURLE_COULDNT_RESOLVE_HOST:
+					case CURLE_COULDNT_CONNECT:
+						conn->state = SMM_CONNECTION_NO_HOST_CONNECTION;
+						break;
+					default:
+						conn->state = SMM_CONNECTION_FAILURE;
+						break;
+				}
+			pthread_mutex_unlock (&conn->lock);
+		}
 
 	curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &res->httpcode);
 	DEBUG ("httpcode = %li\n", res->httpcode);
@@ -513,7 +533,7 @@ smm_asset_connection_login (smm_connection connection)
 						}
 					else
 						{
-							connection->state = SMM_CONNECTION_AUTHENTICATION_FAILURE;
+							connection->state = SMM_CONNECTION_FAILURE;
 						}
 				}
 			else
