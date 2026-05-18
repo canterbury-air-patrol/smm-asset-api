@@ -14,6 +14,13 @@ PKG_CHECK_MODULES([CURL],[libcurl])
 PKG_CHECK_MODULES([JANSSON],[jansson])
 PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
+AC_ARG_ENABLE([integration-tests],
+  [AS_HELP_STRING([--enable-integration-tests],
+    [build and run integration tests (requires a live SMM server)])],
+  [enable_integration_tests=$enableval],
+  [enable_integration_tests=no])
+AM_CONDITIONAL([INTEGRATION_TESTS], [test "x$enable_integration_tests" = "xyes"])
+
 AC_CHECK_HEADERS([tidy.h],[],[
 AC_CHECK_HEADERS([tidy/tidy.h])])
 

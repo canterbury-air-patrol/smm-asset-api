@@ -16,6 +16,6 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY . .
 
-RUN ./autogen.sh && ./configure && make
+RUN ./autogen.sh && ./configure --enable-integration-tests && make
 
 CMD ["make", "check"]
