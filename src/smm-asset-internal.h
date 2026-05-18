@@ -51,6 +51,7 @@ struct smm_connection_s
 	char *csrfmiddlewaretoken;
 	pthread_mutex_t lock;
 	bool verify_tls;
+	int refcount;
 };
 
 struct smm_asset_s
@@ -94,6 +95,8 @@ size_t to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata);
 
 void smm_connection_share_init (smm_connection conn);
 void smm_connection_share_destroy (smm_connection conn);
+
+void smm_connection_unref (smm_connection conn);
 
 void smm_curl_res_free (struct smm_curl_res_s *);
 struct smm_curl_res_s *smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,

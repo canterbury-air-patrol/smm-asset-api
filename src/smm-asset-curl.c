@@ -71,12 +71,20 @@ smm_connection_share_init (smm_connection conn)
 	if (conn->share == NULL)
 		{
 			CURLSH *share = curl_share_init ();
-			curl_share_setopt (share, CURLSHOPT_LOCKFUNC, smm_curl_lock);
-			curl_share_setopt (share, CURLSHOPT_UNLOCKFUNC, smm_curl_unlock);
-			curl_share_setopt (share, CURLSHOPT_USERDATA, &conn->lock);
-			curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE);
-			curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
-			curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
+			if (share == NULL)
+				{
+					return;
+				}
+			if (curl_share_setopt (share, CURLSHOPT_LOCKFUNC, smm_curl_lock) != CURLSHE_OK ||
+			    curl_share_setopt (share, CURLSHOPT_UNLOCKFUNC, smm_curl_unlock) != CURLSHE_OK ||
+			    curl_share_setopt (share, CURLSHOPT_USERDATA, &conn->lock) != CURLSHE_OK ||
+			    curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE) != CURLSHE_OK ||
+			    curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS) != CURLSHE_OK ||
+			    curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION) != CURLSHE_OK)
+				{
+					curl_share_cleanup (share);
+					return;
+				}
 			conn->share = share;
 		}
 }
@@ -153,10 +161,12 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		}
 	verify_tls = conn->verify_tls;
 	share = conn->share;
+	conn->refcount++;
 	pthread_mutex_unlock (&conn->lock);
 
 	if (host == NULL)
 		{
+			smm_connection_unref (conn);
 			return NULL;
 		}
 
@@ -164,6 +174,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 	if (res == NULL)
 		{
 			free (host);
+			smm_connection_unref (conn);
 			return NULL;
 		}
 
@@ -172,6 +183,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 			free (host);
 			free (res);
 			DEBUG ("failed to allocate full_uri");
+			smm_connection_unref (conn);
 			return NULL;
 		}
 	free (host);
@@ -181,6 +193,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		{
 			free (res->full_uri);
 			free (res);
+			smm_connection_unref (conn);
 			return NULL;
 		}
 
@@ -266,6 +279,8 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 
 	curl_slist_free_all (headers);
 	curl_easy_cleanup (curl);
+
+	smm_connection_unref (conn);
 
 	DEBUG ("Done\n");
 
@@ -436,9 +451,10 @@ smm_asset_connection_login (smm_connection connection)
 			if (connection->csrfmiddlewaretoken)
 				{
 					char *post_data = NULL;
-					char *esc_csrf = curl_easy_escape (NULL, connection->csrfmiddlewaretoken, 0);
-					char *esc_user = curl_easy_escape (NULL, connection->user, 0);
-					char *esc_pass = curl_easy_escape (NULL, connection->pass, 0);
+					CURL *esc_curl = curl_easy_init ();
+					char *esc_csrf = curl_easy_escape (esc_curl, connection->csrfmiddlewaretoken, 0);
+					char *esc_user = curl_easy_escape (esc_curl, connection->user, 0);
+					char *esc_pass = curl_easy_escape (esc_curl, connection->pass, 0);
 
 					if (esc_csrf && esc_user && esc_pass)
 						{
@@ -470,6 +486,7 @@ smm_asset_connection_login (smm_connection connection)
 					curl_free (esc_csrf);
 					curl_free (esc_user);
 					curl_free (esc_pass);
+					curl_easy_cleanup (esc_curl);
 				}
 			else
 				{
@@ -512,6 +529,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 				{
 					DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
 					/* It's possible we need to upgrade to https */
+					pthread_mutex_lock (&conn->lock);
 					if (strncmp (conn->host, "https://", 8) != 0
 					    && strncmp (res->redirect_url, "https://", 8) == 0)
 						{
@@ -545,6 +563,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 									retry = true;
 								}
 						}
+					pthread_mutex_unlock (&conn->lock);
 
 					if (!retry && strstr (res->redirect_url, "accounts/login") != NULL)
 						{

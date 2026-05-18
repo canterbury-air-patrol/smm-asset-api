@@ -12,6 +12,10 @@ from django.contrib.auth.models import User
 from assets.models import Asset, AssetType
 if not User.objects.filter(username='testuser').exists():
     User.objects.create_superuser('testuser', 'test@example.com', 'testpass')
+else:
+    u = User.objects.get(username='testuser')
+    u.set_password('testpass')
+    u.save()
 
 # Create a test asset type and asset
 at, _ = AssetType.objects.get_or_create(name='Test Drone')
