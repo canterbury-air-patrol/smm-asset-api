@@ -55,6 +55,7 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
 	conn->user = strdup (user);
 	conn->pass = strdup (pass);
 	conn->verify_tls = true;
+	conn->refcount = 1;
 
 	if (!conn->host || !conn->user || !conn->pass)
 		{
@@ -93,18 +94,36 @@ smm_asset_connection_tls_verify_set (smm_connection connection, bool verify)
 }
 
 void
-smm_connection_close (smm_connection connection)
+smm_connection_unref (smm_connection connection)
 {
-	if (connection != NULL)
+	if (connection == NULL)
 		{
+			return;
+		}
+
+	pthread_mutex_lock (&connection->lock);
+	connection->refcount--;
+	if (connection->refcount == 0)
+		{
+			pthread_mutex_unlock (&connection->lock);
 			free (connection->host);
 			free (connection->user);
 			free (connection->pass);
 			free (connection->csrfmiddlewaretoken);
 			smm_connection_share_destroy (connection);
 			pthread_mutex_destroy (&connection->lock);
+			free (connection);
 		}
-	free (connection);
+	else
+		{
+			pthread_mutex_unlock (&connection->lock);
+		}
+}
+
+void
+smm_connection_close (smm_connection connection)
+{
+	smm_connection_unref (connection);
 }
 
 smm_asset
