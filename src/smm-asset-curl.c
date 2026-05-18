@@ -65,28 +65,45 @@ smm_curl_unlock (CURL *handle, curl_lock_data data, void *userptr)
 	pthread_mutex_unlock (lock);
 }
 
+static bool
+smm_connection_share_configure (CURLSH *share, pthread_mutex_t *lock)
+{
+	if (curl_share_setopt (share, CURLSHOPT_LOCKFUNC, smm_curl_lock) != CURLSHE_OK)
+		return false;
+	if (curl_share_setopt (share, CURLSHOPT_UNLOCKFUNC, smm_curl_unlock) != CURLSHE_OK)
+		return false;
+	if (curl_share_setopt (share, CURLSHOPT_USERDATA, lock) != CURLSHE_OK)
+		return false;
+	if (curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE) != CURLSHE_OK)
+		return false;
+	if (curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS) != CURLSHE_OK)
+		return false;
+	if (curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION) != CURLSHE_OK)
+		return false;
+	return true;
+}
+
 void
 smm_connection_share_init (smm_connection conn)
 {
-	if (conn->share == NULL)
+	if (conn->share != NULL)
 		{
-			CURLSH *share = curl_share_init ();
-			if (share == NULL)
-				{
-					return;
-				}
-			if (curl_share_setopt (share, CURLSHOPT_LOCKFUNC, smm_curl_lock) != CURLSHE_OK ||
-			    curl_share_setopt (share, CURLSHOPT_UNLOCKFUNC, smm_curl_unlock) != CURLSHE_OK ||
-			    curl_share_setopt (share, CURLSHOPT_USERDATA, &conn->lock) != CURLSHE_OK ||
-			    curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE) != CURLSHE_OK ||
-			    curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS) != CURLSHE_OK ||
-			    curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION) != CURLSHE_OK)
-				{
-					curl_share_cleanup (share);
-					return;
-				}
-			conn->share = share;
+			return;
 		}
+
+	CURLSH *share = curl_share_init ();
+	if (share == NULL)
+		{
+			return;
+		}
+
+	if (!smm_connection_share_configure (share, &conn->lock))
+		{
+			curl_share_cleanup (share);
+			return;
+		}
+
+	conn->share = share;
 }
 
 void
@@ -142,9 +159,10 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 {
 	struct smm_curl_res_s *res = NULL;
 	CURL *curl = NULL;
-	char *host = NULL;
 	bool verify_tls = true;
 	CURLSH *share = NULL;
+	struct curl_slist *headers = NULL;
+	bool have_ref = false;
 
 	DEBUG ("(%p, %s, %s, %p)\n", (void *)conn, path, post_data, write_data);
 
@@ -154,47 +172,30 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 			return NULL;
 		}
 
-	pthread_mutex_lock (&conn->lock);
-	if (conn->host)
-		{
-			host = strdup (conn->host);
-		}
-	verify_tls = conn->verify_tls;
-	share = conn->share;
-	conn->refcount++;
-	pthread_mutex_unlock (&conn->lock);
-
-	if (host == NULL)
-		{
-			smm_connection_unref (conn);
-			return NULL;
-		}
-
 	res = (struct smm_curl_res_s *)calloc (1, sizeof (struct smm_curl_res_s));
 	if (res == NULL)
 		{
-			free (host);
-			smm_connection_unref (conn);
 			return NULL;
 		}
 
-	if (asprintf (&res->full_uri, "%s%s", host, path) < 0)
+	pthread_mutex_lock (&conn->lock);
+	verify_tls = conn->verify_tls;
+	share = conn->share;
+	conn->refcount++;
+	have_ref = true;
+
+	if (asprintf (&res->full_uri, "%s%s", conn->host, path) < 0)
 		{
-			free (host);
-			free (res);
+			pthread_mutex_unlock (&conn->lock);
 			DEBUG ("failed to allocate full_uri");
-			smm_connection_unref (conn);
-			return NULL;
+			goto error;
 		}
-	free (host);
+	pthread_mutex_unlock (&conn->lock);
 
 	curl = curl_easy_init ();
 	if (curl == NULL)
 		{
-			free (res->full_uri);
-			free (res);
-			smm_connection_unref (conn);
-			return NULL;
+			goto error;
 		}
 
 	curl_easy_setopt (curl, CURLOPT_SHARE, share);
@@ -228,8 +229,6 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 			curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, eat_data);
 			curl_easy_setopt (curl, CURLOPT_WRITEDATA, NULL);
 		}
-
-	struct curl_slist *headers = NULL;
 
 	if (json)
 		{
@@ -279,12 +278,31 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 
 	curl_slist_free_all (headers);
 	curl_easy_cleanup (curl);
-
 	smm_connection_unref (conn);
 
 	DEBUG ("Done\n");
 
 	return res;
+
+error:
+	if (headers)
+		{
+			curl_slist_free_all (headers);
+		}
+	if (curl)
+		{
+			curl_easy_cleanup (curl);
+		}
+	if (have_ref)
+		{
+			smm_connection_unref (conn);
+		}
+	if (res)
+		{
+			free (res->full_uri);
+			free (res);
+		}
+	return NULL;
 }
 
 static size_t
@@ -452,6 +470,10 @@ smm_asset_connection_login (smm_connection connection)
 				{
 					char *post_data = NULL;
 					CURL *esc_curl = curl_easy_init ();
+					if (esc_curl == NULL)
+						{
+							return false;
+						}
 					char *esc_csrf = curl_easy_escape (esc_curl, connection->csrfmiddlewaretoken, 0);
 					char *esc_user = curl_easy_escape (esc_curl, connection->user, 0);
 					char *esc_pass = curl_easy_escape (esc_curl, connection->pass, 0);

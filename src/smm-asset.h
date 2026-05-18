@@ -127,7 +127,11 @@ smm_connection_status smm_asset_connection_get_state (smm_connection connection)
 void smm_asset_connection_tls_verify_set (smm_connection connection, bool verify);
 
 /**
- * Close a connection to smm and free associated resources
+ * Close a connection to smm and free associated resources.
+ *
+ * This function should only be called when no other threads are actively
+ * using the connection. Calling this while network requests are in flight
+ * or being initiated on other threads leads to undefined behavior.
  *
  * @param connection the smm_connection object to close and free
  */
