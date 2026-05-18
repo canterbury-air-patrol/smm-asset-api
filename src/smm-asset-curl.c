@@ -83,6 +83,31 @@ smm_connection_share_configure (CURLSH *share, pthread_mutex_t *lock)
 	return true;
 }
 
+static bool
+smm_build_login_post_data (const char *csrf, const char *user, const char *pass, char **out_post)
+{
+	bool ok = false;
+	CURL *curl = curl_easy_init ();
+	if (!curl)
+		return false;
+
+	char *esc_csrf = curl_easy_escape (curl, csrf, 0);
+	char *esc_user = curl_easy_escape (curl, user, 0);
+	char *esc_pass = curl_easy_escape (curl, pass, 0);
+
+	if (esc_csrf && esc_user && esc_pass
+	    && asprintf (out_post, "csrfmiddlewaretoken=%s&username=%s&password=%s", esc_csrf, esc_user, esc_pass) >= 0)
+		{
+			ok = true;
+		}
+
+	curl_free (esc_csrf);
+	curl_free (esc_user);
+	curl_free (esc_pass);
+	curl_easy_cleanup (curl);
+	return ok;
+}
+
 void
 smm_connection_share_init (smm_connection conn)
 {
@@ -188,14 +213,14 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		{
 			pthread_mutex_unlock (&conn->lock);
 			DEBUG ("failed to allocate full_uri");
-			goto error;
+			goto out;
 		}
 	pthread_mutex_unlock (&conn->lock);
 
 	curl = curl_easy_init ();
 	if (curl == NULL)
 		{
-			goto error;
+			goto out;
 		}
 
 	curl_easy_setopt (curl, CURLOPT_SHARE, share);
@@ -276,15 +301,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 				break;
 		}
 
-	curl_slist_free_all (headers);
-	curl_easy_cleanup (curl);
-	smm_connection_unref (conn);
-
-	DEBUG ("Done\n");
-
-	return res;
-
-error:
+out:
 	if (headers)
 		{
 			curl_slist_free_all (headers);
@@ -297,12 +314,16 @@ error:
 		{
 			smm_connection_unref (conn);
 		}
-	if (res)
+	if (res && !res->success && res->httpcode == 0)
 		{
 			free (res->full_uri);
 			free (res);
+			res = NULL;
 		}
-	return NULL;
+
+	DEBUG ("Done\n");
+
+	return res;
 }
 
 static size_t
@@ -469,46 +490,31 @@ smm_asset_connection_login (smm_connection connection)
 			if (connection->csrfmiddlewaretoken)
 				{
 					char *post_data = NULL;
-					CURL *esc_curl = curl_easy_init ();
-					if (esc_curl == NULL)
+					if (smm_build_login_post_data (connection->csrfmiddlewaretoken,
+								       connection->user, connection->pass, &post_data))
 						{
-							return false;
-						}
-					char *esc_csrf = curl_easy_escape (esc_curl, connection->csrfmiddlewaretoken, 0);
-					char *esc_user = curl_easy_escape (esc_curl, connection->user, 0);
-					char *esc_pass = curl_easy_escape (esc_curl, connection->pass, 0);
-
-					if (esc_csrf && esc_user && esc_pass)
-						{
-							if (asprintf (&post_data,
-								      "csrfmiddlewaretoken=%s&username=%s&password=%s",
-								      esc_csrf, esc_user, esc_pass)
-							    >= 0)
+							struct smm_curl_res_s *res_post
+							    = smm_connection_curl_retrieve_url (
+								connection, "/accounts/login/", post_data, NULL, NULL,
+								false);
+							if (res_post && res_post->success
+							    && res_post->httpcode == HTTP_FOUND)
 								{
-									struct smm_curl_res_s *res_post
-									    = smm_connection_curl_retrieve_url (
-										connection, "/accounts/login/",
-										post_data, NULL, NULL, false);
-									if (res_post && res_post->success
-									    && res_post->httpcode == HTTP_FOUND)
-										{
-											res = true;
-											connection->state
-											    = SMM_CONNECTION_CONNECTED;
-										}
-									else
-										{
-											connection->state
-											    = SMM_CONNECTION_AUTHENTICATION_FAILURE;
-										}
-									smm_curl_res_free (res_post);
-									free (post_data);
+									res = true;
+									connection->state = SMM_CONNECTION_CONNECTED;
 								}
+							else
+								{
+									connection->state
+									    = SMM_CONNECTION_AUTHENTICATION_FAILURE;
+								}
+							smm_curl_res_free (res_post);
+							free (post_data);
 						}
-					curl_free (esc_csrf);
-					curl_free (esc_user);
-					curl_free (esc_pass);
-					curl_easy_cleanup (esc_curl);
+					else
+						{
+							connection->state = SMM_CONNECTION_AUTHENTICATION_FAILURE;
+						}
 				}
 			else
 				{
