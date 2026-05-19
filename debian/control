@@ -1,9 +1,9 @@
 Source: libsmm-asset
-Section: unknown
+Section: libs
 Priority: optional
-Maintainer: <sjp@canterburyairpatrol.org>
-Build-Depends: debhelper (>= 10), autotools-dev, pkg-config, libtidy-dev, libcurl-dev, libjansson-dev
-Standards-Version: 4.1.4
+Maintainer: Scott Parlane <sjp@canterburyairpatrol.org>
+Build-Depends: debhelper-compat (= 13), pkg-config, libtidy-dev, libcurl4-openssl-dev | libcurl4-gnutls-dev, libjansson-dev, check
+Standards-Version: 4.7.0
 Homepage: https://github.com/canterbury-air-patrol/smm-asset-api
 
 Package: libsmm-asset

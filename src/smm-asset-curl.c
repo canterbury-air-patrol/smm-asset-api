@@ -225,7 +225,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		}
 
 	curl_easy_setopt (curl, CURLOPT_SHARE, share);
-	curl_easy_setopt (curl, CURLOPT_FAILONERROR, true);
+	curl_easy_setopt (curl, CURLOPT_FAILONERROR, 1L);
 	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, verify_tls ? 1L : 0L);
 	curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, verify_tls ? 2L : 0L);
 	curl_easy_setopt (curl, CURLOPT_COOKIEFILE, "");
@@ -236,13 +236,13 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 		{
 			curl_easy_setopt (curl, CURLOPT_REFERER, res->full_uri);
 			curl_easy_setopt (curl, CURLOPT_POSTFIELDS, post_data);
-			curl_easy_setopt (curl, CURLOPT_POST, 1);
+			curl_easy_setopt (curl, CURLOPT_POST, 1L);
 		}
 	else
 		{
 			curl_easy_setopt (curl, CURLOPT_REFERER, NULL);
 			curl_easy_setopt (curl, CURLOPT_POSTFIELDS, NULL);
-			curl_easy_setopt (curl, CURLOPT_POST, 0);
+			curl_easy_setopt (curl, CURLOPT_POST, 0L);
 		}
 
 	if (write_func)
