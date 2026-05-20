@@ -209,6 +209,36 @@ START_TEST (test_set_command_from_plaintext_other)
 }
 END_TEST
 
+START_TEST (test_set_command_from_plaintext_null)
+{
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	smm_asset_set_command_from_plaintext (asset, NULL, 0);
+	ck_assert_int_eq (smm_asset_last_command (asset), SMM_COMMAND_NONE);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_set_command_from_plaintext_zero_length)
+{
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	smm_asset_set_command_from_plaintext (asset, "", 0);
+	ck_assert_int_eq (smm_asset_last_command (asset), SMM_COMMAND_NONE);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_set_command_from_plaintext_with_trailing)
+{
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	smm_asset_set_command_from_plaintext (asset, "Continue\0garbage", 16);
+	ck_assert_int_eq (smm_asset_last_command (asset), SMM_COMMAND_CONTINUE);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
 START_TEST (test_build_position_url_heading)
 {
 	char *url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
@@ -257,6 +287,9 @@ smm_suite (void)
 	tcase_add_test (tc_position, test_build_position_url_heading);
 	tcase_add_test (tc_position, test_set_command_from_plaintext_continue);
 	tcase_add_test (tc_position, test_set_command_from_plaintext_other);
+	tcase_add_test (tc_position, test_set_command_from_plaintext_null);
+	tcase_add_test (tc_position, test_set_command_from_plaintext_zero_length);
+	tcase_add_test (tc_position, test_set_command_from_plaintext_with_trailing);
 	tcase_add_test (tc_position, test_report_position_null_conn);
 	suite_add_tcase (s, tc_position);
 

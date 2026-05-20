@@ -455,11 +455,14 @@ smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon)
 	return res;
 }
 
+#define CONTINUE_STR "Continue"
+#define CONTINUE_LEN (sizeof (CONTINUE_STR) - 1)
+
 void
 smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len)
 {
 	pthread_mutex_lock (&asset->lock);
-	if (data && strncmp (data, "Continue", len) == 0)
+	if (data && len >= CONTINUE_LEN && strncmp (data, CONTINUE_STR, CONTINUE_LEN) == 0)
 		{
 			asset->last_command = SMM_COMMAND_CONTINUE;
 		}
