@@ -786,11 +786,14 @@ smm_search_action (smm_search search, const char *action)
 	    = smm_connection_curl_retrieve_url (search->asset->conn, action_page, NULL, to_buffer, &buf, false);
 	if (res == NULL)
 		{
+			free (action_page);
 			return false;
 		}
 	else if (!(res->success && res->httpcode == HTTP_SUCCESS))
 		{
 			smm_curl_res_free (res);
+			free (action_page);
+			free (buf.data);
 			return false;
 		}
 
