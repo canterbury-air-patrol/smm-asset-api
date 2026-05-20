@@ -18,7 +18,7 @@ jobs:
     - name: autogen
       run: ./autogen.sh
     - name: configure
-      run: ./configure
+      run: ./configure --enable-werror
     - name: make
       run: make
     - name: Start Docker SMM
