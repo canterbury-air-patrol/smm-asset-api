@@ -148,6 +148,26 @@ START_TEST (test_waypoint_parsing)
 }
 END_TEST
 
+START_TEST (test_set_command_from_plaintext_continue)
+{
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	smm_asset_set_command_from_plaintext (asset, "Continue", 8);
+	ck_assert_int_eq (smm_asset_last_command (asset), SMM_COMMAND_CONTINUE);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_set_command_from_plaintext_other)
+{
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	smm_asset_set_command_from_plaintext (asset, "Other", 5);
+	ck_assert_int_eq (smm_asset_last_command (asset), SMM_COMMAND_NONE);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
 START_TEST (test_build_position_url_heading)
 {
 	char *url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
@@ -182,6 +202,8 @@ smm_suite (void)
 
 	TCase *tc_position = tcase_create ("Position");
 	tcase_add_test (tc_position, test_build_position_url_heading);
+	tcase_add_test (tc_position, test_set_command_from_plaintext_continue);
+	tcase_add_test (tc_position, test_set_command_from_plaintext_other);
 	suite_add_tcase (s, tc_position);
 
 	tc_csrf = tcase_create ("CSRF");

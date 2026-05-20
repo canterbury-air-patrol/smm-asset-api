@@ -116,3 +116,5 @@ void smm_asset_free_asset (smm_asset assets);
 
 char *smm_asset_build_position_url (long long asset_id, double lat, double lon, unsigned int alt, uint16_t heading,
 				    uint8_t fix);
+
+void smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len);
