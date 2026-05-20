@@ -782,10 +782,6 @@ smm_search_action (smm_search search, const char *action)
 		{
 			return false;
 		}
-	if (action_page == NULL)
-		{
-			return false;
-		}
 
 	struct smm_curl_res_s *res
 	    = smm_connection_curl_retrieve_url (search->asset->conn, action_page, NULL, to_buffer, &buf, false);
