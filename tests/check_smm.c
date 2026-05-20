@@ -214,6 +214,17 @@ START_TEST (test_invalid_host)
 }
 END_TEST
 
+START_TEST (test_connection_login_fields_initialised)
+{
+	smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
+	ck_assert_ptr_nonnull (conn);
+	/* login_in_progress must be false after smm_asset_connect; if not, a
+	 * subsequent caller would deadlock waiting on the condition variable. */
+	ck_assert_int_eq (conn->login_in_progress, false);
+	smm_connection_close (conn);
+}
+END_TEST
+
 Suite *
 smm_suite (void)
 {
@@ -225,6 +236,7 @@ smm_suite (void)
 
 	tc_conn = tcase_create ("Connection");
 	tcase_add_test (tc_conn, test_invalid_host);
+	tcase_add_test (tc_conn, test_connection_login_fields_initialised);
 	suite_add_tcase (s, tc_conn);
 
 	TCase *tc_position = tcase_create ("Position");

@@ -67,6 +67,8 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
 		}
 
 	pthread_mutex_init (&conn->lock, NULL);
+	conn->login_in_progress = false;
+	pthread_cond_init (&conn->login_cond, NULL);
 	if (!smm_connection_share_init (conn))
 		{
 			conn->state = SMM_CONNECTION_FAILURE;
@@ -129,6 +131,7 @@ smm_connection_unref (smm_connection connection)
 			free (connection->pass);
 			free (connection->csrfmiddlewaretoken);
 			smm_connection_share_destroy (connection);
+			pthread_cond_destroy (&connection->login_cond);
 			pthread_mutex_destroy (&connection->lock);
 			free (connection);
 		}
