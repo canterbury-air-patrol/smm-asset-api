@@ -162,6 +162,15 @@ START_TEST (test_waypoint_parsing)
 }
 END_TEST
 
+START_TEST (test_search_sweep_width)
+{
+	struct smm_search_s search;
+	memset (&search, 0, sizeof (search));
+	search.sweep_width = 100;
+	ck_assert_uint_eq (smm_search_sweep_width (&search), 100);
+}
+END_TEST
+
 START_TEST (test_get_search_absolute_url_ignored)
 {
 	const char *json = "{\"object_url\": \"https://example.com/search/1/\", \"distance\": 10, \"length\": 100, "
@@ -341,6 +350,7 @@ smm_suite (void)
 
 	TCase *tc_search = tcase_create ("Search");
 	tcase_add_test (tc_search, test_search_accept_null_conn);
+	tcase_add_test (tc_search, test_search_sweep_width);
 	tcase_add_test (tc_search, test_get_search_absolute_url_ignored);
 	tcase_add_test (tc_search, test_get_search_relative_url_accepted);
 	suite_add_tcase (s, tc_search);

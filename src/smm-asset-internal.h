@@ -83,7 +83,7 @@ struct smm_search_s
 	char *url;
 	uint64_t distance;
 	uint64_t length;
-	uint32_t sweep_width;
+	uint64_t sweep_width;
 };
 
 struct smm_curl_res_s
