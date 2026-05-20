@@ -29,6 +29,14 @@
 
 #include <curl/curl.h>
 
+enum http_return_codes
+{
+	HTTP_SUCCESS = 200,
+	HTTP_MOVED_PERMANENTLY = 301,
+	HTTP_FOUND = 302,
+	HTTP_SEE_OTHER = 303,
+};
+
 extern bool smm_debug;
 #define DEBUG(...)                                                                                                     \
 	do                                                                                                             \

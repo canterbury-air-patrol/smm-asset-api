@@ -38,14 +38,6 @@
 #error No tidy header(s)
 #endif
 
-enum http_return_codes
-{
-	HTTP_SUCCESS = 200,
-	HTTP_MOVED_PERMANENTLY = 301,
-	HTTP_FOUND = 302,
-	HTTP_SEE_OTHER = 303,
-};
-
 static void
 smm_curl_lock (CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr)
 {
