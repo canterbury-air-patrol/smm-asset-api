@@ -38,7 +38,7 @@ enum http_return_codes
 	HTTP_SEE_OTHER = 303,
 };
 
-extern bool smm_debug;
+extern _Atomic bool smm_debug;
 #define DEBUG(...)                                                                                                     \
 	do                                                                                                             \
 		{                                                                                                      \

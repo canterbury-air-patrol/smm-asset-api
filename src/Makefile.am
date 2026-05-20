@@ -1,4 +1,4 @@
-AM_CFLAGS = $(WERROR_CFLAGS) -Wall -Wformat=2 -Wvla -Wextra -Wwrite-strings -Wmissing-prototypes -Wunreachable-code -pedantic -std=c99 -D_DEFAULT_SOURCE -D_GNU_SOURCE
+AM_CFLAGS = $(WERROR_CFLAGS) -Wall -Wformat=2 -Wvla -Wextra -Wwrite-strings -Wmissing-prototypes -Wunreachable-code -pedantic -std=c11 -D_DEFAULT_SOURCE -D_GNU_SOURCE
 AM_CFLAGS += $(TIDY_CFLAGS) $(CURL_CFLAGS) $(JANSSON_CFLAGS)
 
 lib_LTLIBRARIES = libsmmasset.la
