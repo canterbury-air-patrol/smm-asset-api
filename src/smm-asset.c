@@ -839,6 +839,62 @@ smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count)
 }
 
 smm_search
+smm_parse_search_json (smm_asset asset, const char *data, size_t len)
+{
+	smm_search search = NULL;
+	json_t *json_root = NULL;
+	json_error_t json_error;
+
+	json_root = json_loadb (data, len, 0, &json_error);
+	if (json_root)
+		{
+			const char *url = NULL;
+			uint64_t distance = 0;
+			uint64_t length = 0;
+			uint64_t sweep_width = 0;
+			json_t *tmp = json_object_get (json_root, "object_url");
+			if (tmp)
+				{
+					url = json_string_value (tmp);
+				}
+			/* The server contract emits object_url as a relative path
+			 * (e.g. "/search/42/"). Reject absolute URLs defensively in
+			 * case the contract ever changes — accepting them blindly
+			 * here would let the server steer us at an arbitrary host. */
+			if (url && (strncmp (url, "http://", 7) == 0 || strncmp (url, "https://", 8) == 0))
+				{
+					DEBUG ("object_url is absolute; ignoring\n");
+					url = NULL;
+				}
+			tmp = json_object_get (json_root, "distance");
+			if (tmp)
+				{
+					distance = json_integer_value (tmp);
+				}
+			tmp = json_object_get (json_root, "length");
+			if (tmp)
+				{
+					length = json_integer_value (tmp);
+				}
+			tmp = json_object_get (json_root, "sweep_width");
+			if (tmp)
+				{
+					sweep_width = json_integer_value (tmp);
+				}
+			if (url)
+				{
+					search = smm_search_create (asset, url, length, distance, sweep_width);
+				}
+			json_decref (json_root);
+		}
+	else
+		{
+			DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
+		}
+	return search;
+}
+
+smm_search
 smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 {
 	smm_search search = NULL;
@@ -870,43 +926,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 
 	if (res->content_type != NULL && strcmp (res->content_type, "application/json") == 0)
 		{
-			json_t *json_root = NULL;
-			json_error_t json_error;
-
-			json_root = json_loadb (buf.data, buf.bytes, 0, &json_error);
-			if (json_root)
-				{
-					const char *url = NULL;
-					uint64_t distance = 0;
-					uint64_t length = 0;
-					uint64_t sweep_width = 0;
-					json_t *tmp = json_object_get (json_root, "object_url");
-					if (tmp)
-						{
-							url = json_string_value (tmp);
-						}
-					tmp = json_object_get (json_root, "distance");
-					if (tmp)
-						{
-							distance = json_integer_value (tmp);
-						}
-					tmp = json_object_get (json_root, "length");
-					if (tmp)
-						{
-							length = json_integer_value (tmp);
-						}
-					tmp = json_object_get (json_root, "sweep_width");
-					if (tmp)
-						{
-							sweep_width = json_integer_value (tmp);
-						}
-					search = smm_search_create (asset, url, length, distance, sweep_width);
-					json_decref (json_root);
-				}
-			else
-				{
-					DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
-				}
+			search = smm_parse_search_json (asset, buf.data, buf.bytes);
 		}
 	smm_curl_res_free (res);
 	free (buf.data);
