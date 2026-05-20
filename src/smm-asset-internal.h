@@ -26,6 +26,7 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #include <curl/curl.h>
 
