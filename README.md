@@ -1,6 +1,6 @@
 # Search Management Map Asset API
 
-A C library for accessing the asset side of the API for [Search Management Map](https://github.com/canterburyairpatrol/search-management-map)
+A C library for accessing the asset side of the API for [Search Management Map](https://github.com/canterbury-air-patrol/search-management-map)
 
 ## Getting started
 ### Prerequisites
@@ -15,7 +15,7 @@ A C library for accessing the asset side of the API for [Search Management Map](
 git clone https://github.com/canterbury-air-patrol/smm-asset-api.git
 cd smm-asset-api
 ./autogen.sh
-./configure -prefix=/usr
+./configure --prefix=/usr
 make
 make install
 ```
@@ -25,21 +25,23 @@ make install
 Link your program against -lsmmasset or use pkg-config with the installed smm-asset.pc.
 
 Basic API usage example
-```
+```c
 #include <smm-asset.h>
+#include <stdio.h>
+#include <string.h>
 
 int main(int argc, char *argv[])
 {
-	smm_asset *assets;
+	smm_assets assets;
 	size_t assets_count;
 	smm_asset asset = NULL;
 
 	smm_connection conn = smm_asset_connect ("http://localhost/", "asset", "assetpassword");
-	if (smm_asset_get_assets (conn, &assets, assets_count))
+	if (smm_asset_get_assets (conn, &assets, &assets_count))
 	{
 		for (size_t i = 0; i < assets_count; i++)
 		{
-			if (strcmp (smm_asset_get_name (assets[i]), "my-asset") == 0)
+			if (strcmp (smm_asset_name (assets[i]), "my-asset") == 0)
 			{
 				asset = assets[i];
 			}
@@ -54,16 +56,22 @@ int main(int argc, char *argv[])
 		smm_search search;
 		do {
 			search = smm_asset_get_search (asset, -43, 172);
-		} while (!smm_search_accept (search));
-		/* All the waypoints for the search are accessible with */
-		smm_waypoints waypoints;
-		size_t waypoints_count;
-		smm_search_waypoints_get (search, &waypoints, &waypoints_count);
-		/* Iterate them the same as assets, then free with */
-		smm_waypoints_free (waypoints, waypoints_count);
-		/* Once the search is completed then */
-		smm_search_completed (search);
-		smm_search_destroy (search);
+		} while (search != NULL && !smm_search_accept (search));
+
+		if (search != NULL)
+		{
+			/* All the waypoints for the search are accessible with */
+			smm_waypoints waypoints;
+			size_t waypoints_count;
+			if (smm_search_get_waypoints (search, &waypoints, &waypoints_count))
+			{
+				/* Iterate them the same as assets, then free with */
+				smm_waypoints_free (waypoints, waypoints_count);
+			}
+			/* Once the search is completed then */
+			smm_search_complete (search);
+			smm_search_destroy (search);
+		}
 	}
 
 	smm_asset_free_assets (assets, assets_count);
@@ -76,4 +84,3 @@ See the list of [contributors](https://github.com/canterbury-air-patrol/smm-asse
 
 ## License
 This project is licensed under GNU LGPLv2.1 see the [LICENSE.md](LICENSE.md) file for details.
-

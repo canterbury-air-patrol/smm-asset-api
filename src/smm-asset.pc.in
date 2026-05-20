@@ -5,7 +5,7 @@ includedir=@includedir@
 
 Name: @PACKAGE_NAME@
 Description: Library to act as an Asset for Search Management Map
-URL: https://github.com/canterbury-air-patrol/smm-asset
+URL: https://github.com/canterbury-air-patrol/smm-asset-api
 Version: @VERSION@
 Libs: -lsmmasset
 Cflags: -I${includedir}
