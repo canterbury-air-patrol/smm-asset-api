@@ -363,16 +363,19 @@ smm_parse_command (const char *data, size_t len, smm_asset_command *command, dou
 							res = true;
 							if (strcmp (cmd_str, "GOTO") == 0)
 								{
-									/* Get lat and long as well */
+									/* Get lat and long as well. Accept any
+									 * JSON number (real or integer); the
+									 * server normally emits floats but the
+									 * contract does not guarantee it. */
 									tmp = json_object_get (json_root, "latitude");
-									if (json_is_real (tmp))
+									if (json_is_number (tmp))
 										{
-											*lat = json_real_value (tmp);
+											*lat = json_number_value (tmp);
 										}
 									tmp = json_object_get (json_root, "longitude");
-									if (json_is_real (tmp))
+									if (json_is_number (tmp))
 										{
-											*lon = json_real_value (tmp);
+											*lon = json_number_value (tmp);
 										}
 									*command = SMM_COMMAND_GOTO;
 								}
