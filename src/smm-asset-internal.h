@@ -120,3 +120,5 @@ char *smm_asset_build_position_url (long long asset_id, double lat, double lon, 
 				    uint8_t fix);
 
 void smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len);
+
+smm_search smm_parse_search_json (smm_asset asset, const char *data, size_t len);
