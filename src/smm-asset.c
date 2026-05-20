@@ -500,6 +500,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
 		{
 			smm_curl_res_free (res);
 			free (page);
+			free (buf.data);
 			return false;
 		}
 
