@@ -449,6 +449,21 @@ smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon)
 	return res;
 }
 
+void
+smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len)
+{
+	pthread_mutex_lock (&asset->lock);
+	if (data && strncmp (data, "Continue", len) == 0)
+		{
+			asset->last_command = SMM_COMMAND_CONTINUE;
+		}
+	else
+		{
+			asset->last_command = SMM_COMMAND_NONE;
+		}
+	pthread_mutex_unlock (&asset->lock);
+}
+
 char *
 smm_asset_build_position_url (long long asset_id, double lat, double lon, unsigned int alt, uint16_t heading,
 			      uint8_t fix)
@@ -497,14 +512,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
 		}
 	else
 		{
-			if (buf.data && strncmp (buf.data, "Continue", buf.bytes) == 0)
-				{
-					asset->last_command = SMM_COMMAND_CONTINUE;
-				}
-			else
-				{
-					asset->last_command = SMM_COMMAND_NONE;
-				}
+			smm_asset_set_command_from_plaintext (asset, buf.data, buf.bytes);
 		}
 
 	free (buf.data);
