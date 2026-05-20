@@ -148,6 +148,16 @@ START_TEST (test_waypoint_parsing)
 }
 END_TEST
 
+START_TEST (test_build_position_url_heading)
+{
+	char *url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
+	ck_assert_ptr_nonnull (url);
+	ck_assert_ptr_nonnull (strstr (url, "heading="));
+	ck_assert_ptr_null (strstr (url, "bearing="));
+	free (url);
+}
+END_TEST
+
 START_TEST (test_invalid_host)
 {
 	smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
@@ -169,6 +179,10 @@ smm_suite (void)
 	tc_conn = tcase_create ("Connection");
 	tcase_add_test (tc_conn, test_invalid_host);
 	suite_add_tcase (s, tc_conn);
+
+	TCase *tc_position = tcase_create ("Position");
+	tcase_add_test (tc_position, test_build_position_url_heading);
+	suite_add_tcase (s, tc_position);
 
 	tc_csrf = tcase_create ("CSRF");
 	tcase_add_test (tc_csrf, test_csrf_extraction);

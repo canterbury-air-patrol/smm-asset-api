@@ -113,3 +113,6 @@ bool smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints
 smm_asset smm_asset_create (smm_connection connection, const char *name, const char *type, long long asset_id,
 			    long long asset_type_id);
 void smm_asset_free_asset (smm_asset assets);
+
+char *smm_asset_build_position_url (long long asset_id, double lat, double lon, unsigned int alt, uint16_t heading,
+				    uint8_t fix);
