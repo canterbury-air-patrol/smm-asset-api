@@ -449,16 +449,28 @@ smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon)
 	return res;
 }
 
+char *
+smm_asset_build_position_url (long long asset_id, double lat, double lon, unsigned int alt, uint16_t heading,
+			      uint8_t fix)
+{
+	char *page = NULL;
+	if (asprintf (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&heading=%u&fix=%u", asset_id, lat,
+		      lon, alt, heading, fix)
+	    < 0)
+		{
+			return NULL;
+		}
+	return page;
+}
+
 bool
 smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t bearing,
 			   uint8_t fix)
 {
 	struct buffer_s buf = { NULL, 0 };
 
-	char *page = NULL;
-	if (asprintf (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&bearing=%u&fix=%u",
-		      asset->asset_id, latitude, longitude, altitude, bearing, fix)
-	    < 0)
+	char *page = smm_asset_build_position_url (asset->asset_id, latitude, longitude, altitude, bearing, fix);
+	if (page == NULL)
 		{
 			return false;
 		}
