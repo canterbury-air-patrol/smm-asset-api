@@ -29,7 +29,7 @@
 
 #include <jansson.h>
 
-bool smm_debug = false;
+_Atomic bool smm_debug = false;
 
 void
 smm_asset_debugging_set (bool debug)
