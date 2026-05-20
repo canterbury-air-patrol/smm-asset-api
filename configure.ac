@@ -9,6 +9,12 @@ AM_PROG_AR
 
 LT_INIT([disable-static pic-only])
 
+AC_ARG_ENABLE([werror],
+  AS_HELP_STRING([--enable-werror], [treat warnings as errors]),
+  [werror=$enableval], [werror=no])
+AS_IF([test "x$werror" = "xyes"], [WERROR_CFLAGS="-Werror"])
+AC_SUBST([WERROR_CFLAGS])
+
 PKG_CHECK_MODULES([TIDY],[tidy])
 PKG_CHECK_MODULES([CURL],[libcurl])
 PKG_CHECK_MODULES([JANSSON],[jansson])
