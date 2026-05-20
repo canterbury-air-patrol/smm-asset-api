@@ -165,6 +165,16 @@ START_TEST (test_search_accept_null_conn)
 }
 END_TEST
 
+START_TEST (test_report_position_null_conn)
+{
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	bool r = smm_asset_report_position (asset, -43.5, 172.6, 100, 270, 3);
+	ck_assert_int_eq (r, false);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
 START_TEST (test_set_command_from_plaintext_continue)
 {
 	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
@@ -221,6 +231,7 @@ smm_suite (void)
 	tcase_add_test (tc_position, test_build_position_url_heading);
 	tcase_add_test (tc_position, test_set_command_from_plaintext_continue);
 	tcase_add_test (tc_position, test_set_command_from_plaintext_other);
+	tcase_add_test (tc_position, test_report_position_null_conn);
 	suite_add_tcase (s, tc_position);
 
 	tc_csrf = tcase_create ("CSRF");
