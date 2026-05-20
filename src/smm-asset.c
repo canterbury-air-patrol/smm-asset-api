@@ -29,11 +29,6 @@
 
 #include <jansson.h>
 
-enum http_return_codes
-{
-	HTTP_SUCCESS = 200,
-};
-
 bool smm_debug = false;
 
 void
