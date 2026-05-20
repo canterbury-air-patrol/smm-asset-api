@@ -52,6 +52,8 @@ struct smm_connection_s
 	pthread_mutex_t lock;
 	bool verify_tls;
 	int refcount;
+	bool login_in_progress;
+	pthread_cond_t login_cond;
 };
 
 struct smm_asset_s

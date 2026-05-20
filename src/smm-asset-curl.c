@@ -495,6 +495,24 @@ smm_asset_connection_login (smm_connection connection)
 {
 	bool res = false;
 	TidyBuffer docbuf = { 0 };
+	char *csrf_token = NULL;
+	smm_connection_status new_state = SMM_CONNECTION_FAILURE;
+
+	/* Serialise concurrent login attempts. If another thread is already
+	 * logging in, wait for it to finish. When it does, if the connection is
+	 * now CONNECTED, return success without making another login attempt. */
+	pthread_mutex_lock (&connection->lock);
+	while (connection->login_in_progress)
+		{
+			pthread_cond_wait (&connection->login_cond, &connection->lock);
+		}
+	if (connection->state == SMM_CONNECTION_CONNECTED)
+		{
+			pthread_mutex_unlock (&connection->lock);
+			return true;
+		}
+	connection->login_in_progress = true;
+	pthread_mutex_unlock (&connection->lock);
 
 	tidyBufInit (&docbuf);
 
@@ -505,13 +523,13 @@ smm_asset_connection_login (smm_connection connection)
 	if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
 		{
 			/* find the input token with the csrfmiddlewaretoken */
-			connection->csrfmiddlewaretoken = smm_parse_csrf_token ((const char *)docbuf.bp, docbuf.size);
+			csrf_token = smm_parse_csrf_token ((const char *)docbuf.bp, docbuf.size);
 
-			if (connection->csrfmiddlewaretoken)
+			if (csrf_token)
 				{
 					char *post_data = NULL;
-					if (smm_build_login_post_data (connection->csrfmiddlewaretoken,
-								       connection->user, connection->pass, &post_data))
+					if (smm_build_login_post_data (csrf_token, connection->user, connection->pass,
+								       &post_data))
 						{
 							struct smm_curl_res_s *res_post
 							    = smm_connection_curl_retrieve_url (
@@ -521,31 +539,30 @@ smm_asset_connection_login (smm_connection connection)
 							    && res_post->httpcode == HTTP_FOUND)
 								{
 									res = true;
-									connection->state = SMM_CONNECTION_CONNECTED;
+									new_state = SMM_CONNECTION_CONNECTED;
 								}
 							else
 								{
-									connection->state
-									    = SMM_CONNECTION_AUTHENTICATION_FAILURE;
+									new_state = SMM_CONNECTION_AUTHENTICATION_FAILURE;
 								}
 							smm_curl_res_free (res_post);
 							free (post_data);
 						}
 					else
 						{
-							connection->state = SMM_CONNECTION_FAILURE;
+							new_state = SMM_CONNECTION_FAILURE;
 						}
 				}
 			else
 				{
 					DEBUG ("Failed to find CSRF token in login page\n");
-					connection->state = SMM_CONNECTION_PROTOCOL_ERROR;
+					new_state = SMM_CONNECTION_PROTOCOL_ERROR;
 				}
 		}
 	else if (!res_get)
 		{
 			DEBUG ("No res object returned\n");
-			connection->state = SMM_CONNECTION_NO_HOST_CONNECTION;
+			new_state = SMM_CONNECTION_NO_HOST_CONNECTION;
 		}
 	else
 		{
@@ -555,6 +572,19 @@ smm_asset_connection_login (smm_connection connection)
 	smm_curl_res_free (res_get);
 
 	tidyBufFree (&docbuf);
+
+	/* Publish the CSRF token and state under the lock, then release the
+	 * login flag and wake any waiters. */
+	pthread_mutex_lock (&connection->lock);
+	if (csrf_token)
+		{
+			free (connection->csrfmiddlewaretoken);
+			connection->csrfmiddlewaretoken = csrf_token;
+		}
+	connection->state = new_state;
+	connection->login_in_progress = false;
+	pthread_cond_broadcast (&connection->login_cond);
+	pthread_mutex_unlock (&connection->lock);
 
 	return res;
 }
