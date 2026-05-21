@@ -51,8 +51,8 @@ typedef struct smm_search_s *smm_search;
  */
 typedef struct smm_waypoint_s
 {
-	double lat;
-	double lon;
+    double lat;
+    double lon;
 } *smm_waypoint;
 
 /**
@@ -65,13 +65,13 @@ typedef struct smm_waypoint_s **smm_waypoints;
  */
 typedef enum
 {
-	SMM_CONNECTION_UNKNOWN,		       /*!< Unknown state or invalid object */
-	SMM_CONNECTION_CONNECTED,	       /*!< Currently connected */
-	SMM_CONNECTION_HOST_INVALID,	       /*!< Host URL invalid, i.e. not http(s):// or not a valid domain */
-	SMM_CONNECTION_NO_HOST_CONNECTION,     /*!< Unable to connect to host */
-	SMM_CONNECTION_AUTHENTICATION_FAILURE, /*!< Unable to authenticate with host */
-	SMM_CONNECTION_PROTOCOL_ERROR,	       /*!< Unexpected response from host */
-	SMM_CONNECTION_FAILURE,		       /*!< Unable to communicate, for another reason */
+    SMM_CONNECTION_UNKNOWN,                /*!< Unknown state or invalid object */
+    SMM_CONNECTION_CONNECTED,              /*!< Currently connected */
+    SMM_CONNECTION_HOST_INVALID,           /*!< Host URL invalid, i.e. not http(s):// or not a valid domain */
+    SMM_CONNECTION_NO_HOST_CONNECTION,     /*!< Unable to connect to host */
+    SMM_CONNECTION_AUTHENTICATION_FAILURE, /*!< Unable to authenticate with host */
+    SMM_CONNECTION_PROTOCOL_ERROR,         /*!< Unexpected response from host */
+    SMM_CONNECTION_FAILURE,                /*!< Unable to communicate, for another reason */
 } smm_connection_status;
 
 /**
@@ -79,14 +79,14 @@ typedef enum
  */
 typedef enum
 {
-	SMM_COMMAND_NONE,	      /*!< No restriction on current operation */
-	SMM_COMMAND_CIRCLE,	      /*!< Circle/Hold at current position */
-	SMM_COMMAND_RTL,	      /*!< Return to launch site */
-	SMM_COMMAND_GOTO,	      /*!< Goto to the specified position */
-	SMM_COMMAND_CONTINUE,	      /*!< Previous command revoked, resume own navigation */
-	SMM_COMMAND_ABANDON_SEARCH,   /*!< Abandon the current search, expect reassignment */
-	SMM_COMMAND_MISSION_COMPLETE, /*!< The mission has concluded, return to base */
-	SMM_COMMAND_UNKNOWN,	      /*!< The command from the server is not known */
+    SMM_COMMAND_NONE,             /*!< No restriction on current operation */
+    SMM_COMMAND_CIRCLE,           /*!< Circle/Hold at current position */
+    SMM_COMMAND_RTL,              /*!< Return to launch site */
+    SMM_COMMAND_GOTO,             /*!< Goto to the specified position */
+    SMM_COMMAND_CONTINUE,         /*!< Previous command revoked, resume own navigation */
+    SMM_COMMAND_ABANDON_SEARCH,   /*!< Abandon the current search, expect reassignment */
+    SMM_COMMAND_MISSION_COMPLETE, /*!< The mission has concluded, return to base */
+    SMM_COMMAND_UNKNOWN,          /*!< The command from the server is not known */
 } smm_asset_command;
 
 /**
@@ -187,7 +187,7 @@ const char *smm_asset_type (smm_asset asset);
  * @return true if the position was reported to the server
  */
 bool smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude,
-				uint16_t heading, uint8_t fix);
+                                uint16_t heading, uint8_t fix);
 
 /**
  * Get the last command we saw from the server
