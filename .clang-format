@@ -3,7 +3,7 @@ Language: Cpp
 BasedOnStyle: GNU
 IndentWidth: 8
 UseTab: Always
-BreakBeforeBraces: GNU
+BreakBeforeBraces: Allman
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: true
 ColumnLimit: 120
