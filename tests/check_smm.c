@@ -289,6 +289,139 @@ START_TEST (test_invalid_host)
 }
 END_TEST
 
+START_TEST (test_command_parsing_circle)
+{
+	const char *json = "{\"action\": \"CIR\"}";
+	smm_asset_command cmd;
+	double lat = 0, lon = 0;
+	bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+	ck_assert_uint_eq (res, true);
+	ck_assert_int_eq (cmd, SMM_COMMAND_CIRCLE);
+}
+END_TEST
+
+START_TEST (test_command_parsing_abandon_search)
+{
+	const char *json = "{\"action\": \"AS\"}";
+	smm_asset_command cmd;
+	double lat = 0, lon = 0;
+	bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+	ck_assert_uint_eq (res, true);
+	ck_assert_int_eq (cmd, SMM_COMMAND_ABANDON_SEARCH);
+}
+END_TEST
+
+START_TEST (test_command_parsing_mission_complete)
+{
+	const char *json = "{\"action\": \"MC\"}";
+	smm_asset_command cmd;
+	double lat = 0, lon = 0;
+	bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+	ck_assert_uint_eq (res, true);
+	ck_assert_int_eq (cmd, SMM_COMMAND_MISSION_COMPLETE);
+}
+END_TEST
+
+START_TEST (test_command_parsing_continue)
+{
+	const char *json = "{\"action\": \"RON\"}";
+	smm_asset_command cmd;
+	double lat = 0, lon = 0;
+	bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+	ck_assert_uint_eq (res, true);
+	ck_assert_int_eq (cmd, SMM_COMMAND_CONTINUE);
+}
+END_TEST
+
+START_TEST (test_command_parsing_no_action_field)
+{
+	const char *json = "{\"notaction\": \"RTL\"}";
+	smm_asset_command cmd = SMM_COMMAND_NONE;
+	double lat = 0, lon = 0;
+	bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+	ck_assert_uint_eq (res, false);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_empty_features)
+{
+	const char *json = "{\"features\": []}";
+	smm_waypoints waypoints = NULL;
+	size_t count = 0;
+	bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+	ck_assert_uint_eq (res, false);
+	ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_multiple_features)
+{
+	const char *json
+	    = "{\"features\": [{\"geometry\": {\"coordinates\": [[172.6, -43.5]]}}, {\"geometry\": {\"coordinates\": "
+	      "[[172.7, -43.6]]}}]}";
+	smm_waypoints waypoints = NULL;
+	size_t count = 0;
+	bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+	ck_assert_uint_eq (res, false);
+	ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_asset_last_goto_pos_not_goto)
+{
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	smm_asset_set_command_from_plaintext (asset, "Other", 5);
+	double lat = 99.0, lon = 99.0;
+	bool res = smm_asset_last_goto_pos (asset, &lat, &lon);
+	ck_assert_int_eq (res, false);
+	ck_assert_ldouble_eq_tol (lat, 99.0, 0.0001);
+	ck_assert_ldouble_eq_tol (lon, 99.0, 0.0001);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_asset_last_goto_pos_goto)
+{
+	const char *json = "{\"action\": \"GOTO\", \"latitude\": -43.5, \"longitude\": 172.6}";
+	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+	ck_assert_ptr_nonnull (asset);
+	pthread_mutex_lock (&asset->lock);
+	smm_parse_command (json, strlen (json), &asset->last_command, &asset->last_command_lat,
+			   &asset->last_command_lon);
+	pthread_mutex_unlock (&asset->lock);
+	double lat = 0.0, lon = 0.0;
+	bool res = smm_asset_last_goto_pos (asset, &lat, &lon);
+	ck_assert_int_eq (res, true);
+	ck_assert_ldouble_eq_tol (lat, -43.5, 0.0001);
+	ck_assert_ldouble_eq_tol (lon, 172.6, 0.0001);
+	smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_search_distance_and_length)
+{
+	struct smm_search_s search;
+	memset (&search, 0, sizeof (search));
+	search.distance = 500;
+	search.length = 1200;
+	ck_assert_uint_eq (smm_search_distance (&search), 500);
+	ck_assert_uint_eq (smm_search_length (&search), 1200);
+}
+END_TEST
+
+START_TEST (test_build_position_url_values)
+{
+	char *url = smm_asset_build_position_url (7, -43.5, 172.6, 35, 270, 3);
+	ck_assert_ptr_nonnull (url);
+	ck_assert_ptr_nonnull (strstr (url, "assets/7/"));
+	ck_assert_ptr_nonnull (strstr (url, "alt=35"));
+	ck_assert_ptr_nonnull (strstr (url, "heading=270"));
+	ck_assert_ptr_nonnull (strstr (url, "fix=3"));
+	free (url);
+}
+END_TEST
+
 START_TEST (test_debugging_set)
 {
 	smm_asset_debugging_set (true);
@@ -349,19 +482,33 @@ smm_suite (void)
 	tcase_add_test (tc_commands, test_command_parsing_goto);
 	tcase_add_test (tc_commands, test_command_parsing_goto_integer_coords);
 	tcase_add_test (tc_commands, test_command_parsing_rtl);
+	tcase_add_test (tc_commands, test_command_parsing_circle);
+	tcase_add_test (tc_commands, test_command_parsing_abandon_search);
+	tcase_add_test (tc_commands, test_command_parsing_mission_complete);
+	tcase_add_test (tc_commands, test_command_parsing_continue);
 	tcase_add_test (tc_commands, test_command_parsing_unknown);
+	tcase_add_test (tc_commands, test_command_parsing_no_action_field);
 	suite_add_tcase (s, tc_commands);
 
 	TCase *tc_waypoints = tcase_create ("Waypoints");
 	tcase_add_test (tc_waypoints, test_waypoint_parsing);
+	tcase_add_test (tc_waypoints, test_waypoints_parsing_empty_features);
+	tcase_add_test (tc_waypoints, test_waypoints_parsing_multiple_features);
 	suite_add_tcase (s, tc_waypoints);
 
 	TCase *tc_search = tcase_create ("Search");
 	tcase_add_test (tc_search, test_search_accept_null_conn);
 	tcase_add_test (tc_search, test_search_sweep_width);
+	tcase_add_test (tc_search, test_search_distance_and_length);
 	tcase_add_test (tc_search, test_get_search_absolute_url_ignored);
 	tcase_add_test (tc_search, test_get_search_relative_url_accepted);
 	suite_add_tcase (s, tc_search);
+
+	TCase *tc_position_ext = tcase_create ("PositionExt");
+	tcase_add_test (tc_position_ext, test_build_position_url_values);
+	tcase_add_test (tc_position_ext, test_asset_last_goto_pos_not_goto);
+	tcase_add_test (tc_position_ext, test_asset_last_goto_pos_goto);
+	suite_add_tcase (s, tc_position_ext);
 
 	return s;
 }
