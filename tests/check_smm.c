@@ -477,6 +477,20 @@ START_TEST (test_build_position_url_values)
 }
 END_TEST
 
+START_TEST (test_build_position_url_heading_boundary)
+{
+	char *url0 = smm_asset_build_position_url (1, 0.0, 0.0, 0, 0, 0);
+	ck_assert_ptr_nonnull (url0);
+	ck_assert_ptr_nonnull (strstr (url0, "heading=0"));
+	free (url0);
+
+	char *url359 = smm_asset_build_position_url (1, 0.0, 0.0, 0, 359, 0);
+	ck_assert_ptr_nonnull (url359);
+	ck_assert_ptr_nonnull (strstr (url359, "heading=359"));
+	free (url359);
+}
+END_TEST
+
 START_TEST (test_debugging_set)
 {
 	smm_asset_debugging_set (true);
@@ -583,6 +597,7 @@ smm_suite (void)
 
 	TCase *tc_position_ext = tcase_create ("PositionExt");
 	tcase_add_test (tc_position_ext, test_build_position_url_values);
+	tcase_add_test (tc_position_ext, test_build_position_url_heading_boundary);
 	tcase_add_test (tc_position_ext, test_asset_last_goto_pos_not_goto);
 	tcase_add_test (tc_position_ext, test_asset_last_goto_pos_goto);
 	suite_add_tcase (s, tc_position_ext);
