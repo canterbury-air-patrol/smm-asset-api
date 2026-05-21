@@ -475,6 +475,21 @@ START_TEST (test_connection_login_fields_initialised)
 }
 END_TEST
 
+START_TEST (test_get_state_null_connection)
+{
+	ck_assert_int_eq (smm_asset_connection_get_state (NULL), SMM_CONNECTION_UNKNOWN);
+}
+END_TEST
+
+START_TEST (test_get_state_initial)
+{
+	smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
+	ck_assert_ptr_nonnull (conn);
+	ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_UNKNOWN);
+	smm_connection_close (conn);
+}
+END_TEST
+
 Suite *
 smm_suite (void)
 {
@@ -491,6 +506,8 @@ smm_suite (void)
 	tcase_add_test (tc_conn, test_connect_null_user);
 	tcase_add_test (tc_conn, test_connect_null_pass);
 	tcase_add_test (tc_conn, test_connection_login_fields_initialised);
+	tcase_add_test (tc_conn, test_get_state_null_connection);
+	tcase_add_test (tc_conn, test_get_state_initial);
 	tcase_add_test (tc_conn, test_debugging_set);
 	suite_add_tcase (s, tc_conn);
 
