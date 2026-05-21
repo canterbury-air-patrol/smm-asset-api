@@ -289,6 +289,27 @@ START_TEST (test_invalid_host)
 }
 END_TEST
 
+START_TEST (test_connect_null_host)
+{
+	smm_connection conn = smm_asset_connect (NULL, "user", "pass");
+	ck_assert_ptr_null (conn);
+}
+END_TEST
+
+START_TEST (test_connect_null_user)
+{
+	smm_connection conn = smm_asset_connect ("http://localhost/", NULL, "pass");
+	ck_assert_ptr_null (conn);
+}
+END_TEST
+
+START_TEST (test_connect_null_pass)
+{
+	smm_connection conn = smm_asset_connect ("http://localhost/", "user", NULL);
+	ck_assert_ptr_null (conn);
+}
+END_TEST
+
 START_TEST (test_command_parsing_circle)
 {
 	const char *json = "{\"action\": \"CIR\"}";
@@ -451,6 +472,9 @@ smm_suite (void)
 
 	tc_conn = tcase_create ("Connection");
 	tcase_add_test (tc_conn, test_invalid_host);
+	tcase_add_test (tc_conn, test_connect_null_host);
+	tcase_add_test (tc_conn, test_connect_null_user);
+	tcase_add_test (tc_conn, test_connect_null_pass);
 	tcase_add_test (tc_conn, test_connection_login_fields_initialised);
 	tcase_add_test (tc_conn, test_debugging_set);
 	suite_add_tcase (s, tc_conn);
