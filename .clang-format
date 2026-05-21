@@ -1,8 +1,8 @@
 ---
 Language: Cpp
 BasedOnStyle: GNU
-IndentWidth: 8
-UseTab: Always
+IndentWidth: 4
+UseTab: Never
 BreakBeforeBraces: Allman
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: true
