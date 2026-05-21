@@ -40,6 +40,11 @@ smm_asset_debugging_set (bool debug)
 smm_connection
 smm_asset_connect (const char *host, const char *user, const char *pass)
 {
+	if (host == NULL || user == NULL || pass == NULL)
+		{
+			return NULL;
+		}
+
 	smm_connection conn = calloc (1, sizeof (struct smm_connection_s));
 	if (conn == NULL)
 		{
