@@ -71,7 +71,8 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
     pthread_cond_init (&conn->login_cond, NULL);
     if (!smm_connection_share_init (conn))
     {
-        conn->state = SMM_CONNECTION_FAILURE;
+        smm_connection_unref (conn);
+        return NULL;
     }
 
     /* Early host validation */
