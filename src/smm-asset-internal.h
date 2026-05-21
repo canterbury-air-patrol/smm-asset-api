@@ -110,6 +110,13 @@ void smm_connection_share_destroy (smm_connection conn);
 void smm_connection_unref (smm_connection conn);
 
 void smm_curl_res_free (struct smm_curl_res_s *);
+/* Raw single-shot fetch: no retry, no login redirect, no HTTPS upgrade.
+ * Use this inside login itself to avoid re-entrant login attempts. */
+struct smm_curl_res_s *smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path,
+							   const char *post_data,
+							   size_t (*write_func) (char *ptr, size_t size,
+										 size_t nmemb, void *userdata),
+							   void *write_data, bool json);
 struct smm_curl_res_s *smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
 							 size_t (*write_func) (char *ptr, size_t size, size_t nmemb,
 									       void *userdata),

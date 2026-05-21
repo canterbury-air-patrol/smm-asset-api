@@ -280,6 +280,20 @@ START_TEST (test_build_position_url_heading)
 }
 END_TEST
 
+START_TEST (test_login_in_progress_reset_on_failure)
+{
+	/* login_in_progress must be false after a failed attempt so no caller
+	 * waiting on login_cond is ever stranded. Port 19999 is chosen to be
+	 * unreachable without blocking for long (connect-refused, not timeout). */
+	smm_connection conn = smm_asset_connect ("http://127.0.0.1:19999/", "user", "pass");
+	ck_assert_ptr_nonnull (conn);
+	bool res = smm_asset_connection_login (conn);
+	ck_assert_int_eq (res, false);
+	ck_assert_int_eq (conn->login_in_progress, false);
+	smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_invalid_host)
 {
 	smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
@@ -471,6 +485,7 @@ smm_suite (void)
 	s = suite_create ("SMM");
 
 	tc_conn = tcase_create ("Connection");
+	tcase_add_test (tc_conn, test_login_in_progress_reset_on_failure);
 	tcase_add_test (tc_conn, test_invalid_host);
 	tcase_add_test (tc_conn, test_connect_null_host);
 	tcase_add_test (tc_conn, test_connect_null_user);

@@ -170,7 +170,7 @@ to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 	return new_bytes;
 }
 
-static struct smm_curl_res_s *
+struct smm_curl_res_s *
 smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const char *post_data,
 				    size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata),
 				    void *write_data, bool json)
@@ -508,9 +508,10 @@ smm_asset_connection_login (smm_connection connection)
 
 	tidyBufInit (&docbuf);
 
-	/* Get the login page, so we can get the csrf cookie + token */
+	/* Use the raw (non-retrying) fetch so that a redirect on the login page
+	 * itself does not recurse back into smm_asset_connection_login. */
 	struct smm_curl_res_s *res_get
-	    = smm_connection_curl_retrieve_url (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
+	    = smm_connection_curl_retrieve_url_r (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
 
 	if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
 		{
@@ -524,7 +525,7 @@ smm_asset_connection_login (smm_connection connection)
 								       &post_data))
 						{
 							struct smm_curl_res_s *res_post
-							    = smm_connection_curl_retrieve_url (
+							    = smm_connection_curl_retrieve_url_r (
 								connection, "/accounts/login/", post_data, NULL, NULL,
 								false);
 							if (res_post && res_post->success
