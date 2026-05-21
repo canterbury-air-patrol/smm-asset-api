@@ -182,8 +182,7 @@ END_TEST
 
 START_TEST (test_get_search_relative_url_accepted)
 {
-	const char *json
-	    = "{\"object_url\": \"/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+	const char *json = "{\"object_url\": \"/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
 	smm_search search = smm_parse_search_json (NULL, json, strlen (json));
 	ck_assert_ptr_nonnull (search);
 	ck_assert_uint_eq (smm_search_distance (search), 10);
