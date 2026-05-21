@@ -99,7 +99,10 @@ smm_asset_connection_get_state (smm_connection connection)
 		{
 			return SMM_CONNECTION_UNKNOWN;
 		}
-	return connection->state;
+	pthread_mutex_lock (&connection->lock);
+	smm_connection_status state = connection->state;
+	pthread_mutex_unlock (&connection->lock);
+	return state;
 }
 
 void
