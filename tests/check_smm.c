@@ -402,6 +402,26 @@ START_TEST (test_waypoints_parsing_multiple_features)
 }
 END_TEST
 
+START_TEST (test_waypoint_parsing_integer_coords)
+{
+	/* GeoJSON coordinates may be integers; json_real_value returns 0 for
+	 * integer JSON nodes, so we must use json_number_value instead. */
+	const char *json = "{\"features\": [{\"geometry\": {\"coordinates\": [[173, -44], [172, -43]]}}]}";
+	smm_waypoints waypoints;
+	size_t count;
+	bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+
+	ck_assert_uint_eq (res, true);
+	ck_assert_uint_eq (count, 2);
+	ck_assert_ldouble_eq_tol (waypoints[0]->lat, -44.0, 0.0001);
+	ck_assert_ldouble_eq_tol (waypoints[0]->lon, 173.0, 0.0001);
+	ck_assert_ldouble_eq_tol (waypoints[1]->lat, -43.0, 0.0001);
+	ck_assert_ldouble_eq_tol (waypoints[1]->lon, 172.0, 0.0001);
+
+	smm_waypoints_free (waypoints, count);
+}
+END_TEST
+
 START_TEST (test_asset_last_goto_pos_not_goto)
 {
 	smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
@@ -550,6 +570,7 @@ smm_suite (void)
 	tcase_add_test (tc_waypoints, test_waypoint_parsing);
 	tcase_add_test (tc_waypoints, test_waypoints_parsing_empty_features);
 	tcase_add_test (tc_waypoints, test_waypoints_parsing_multiple_features);
+	tcase_add_test (tc_waypoints, test_waypoint_parsing_integer_coords);
 	suite_add_tcase (s, tc_waypoints);
 
 	TCase *tc_search = tcase_create ("Search");

@@ -675,9 +675,13 @@ smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, siz
 														    = json_array_get (
 															value,
 															0);
-														lat = json_real_value (
+														if (!json_is_number (json_lat) || !json_is_number (json_lon))
+															{
+															    continue;
+															}
+														lat = json_number_value (
 														    json_lat);
-														lon = json_real_value (
+														lon = json_number_value (
 														    json_lon);
 														smm_waypoint
 														    new_wp
