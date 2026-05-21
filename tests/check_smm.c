@@ -179,6 +179,15 @@ START_TEST (test_get_search_absolute_url_ignored)
 }
 END_TEST
 
+START_TEST (test_get_search_http_absolute_url_ignored)
+{
+    const char *json
+        = "{\"object_url\": \"http://example.com/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_null (search);
+}
+END_TEST
+
 START_TEST (test_get_search_relative_url_accepted)
 {
     const char *json = "{\"object_url\": \"/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
@@ -589,6 +598,7 @@ smm_suite (void)
     tcase_add_test (tc_search, test_search_sweep_width);
     tcase_add_test (tc_search, test_search_distance_and_length);
     tcase_add_test (tc_search, test_get_search_absolute_url_ignored);
+    tcase_add_test (tc_search, test_get_search_http_absolute_url_ignored);
     tcase_add_test (tc_search, test_get_search_relative_url_accepted);
     suite_add_tcase (s, tc_search);
 
