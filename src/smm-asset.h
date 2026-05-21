@@ -269,7 +269,7 @@ bool smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size
  *
  * @param search the search to accept
  *
- * @return true if the server accepted this search begining, otherwise @ref smm_search_destroy the search and @ref
+ * @return true if the server accepted this search beginning, otherwise @ref smm_search_destroy the search and @ref
  * smm_asset_get_search again
  */
 bool smm_search_accept (smm_search search);
