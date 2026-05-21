@@ -181,13 +181,13 @@ const char *smm_asset_type (smm_asset asset);
  * @param latitude The current latitude in degrees
  * @param longitude The current longitude in degrees
  * @param altitude The current altitude in meters
- * @param bearing the current course over ground in degrees true
+ * @param heading the current course over ground in degrees true
  * @param fix the accurancy of the current fix (0=unknown, 2=2d only, 3 = 3d fix)
  *
  * @return true if the position was reported to the server
  */
 bool smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude,
-				uint16_t bearing, uint8_t fix);
+				uint16_t heading, uint8_t fix);
 
 /**
  * Get the last command we saw from the server

@@ -491,12 +491,12 @@ smm_asset_build_position_url (long long asset_id, double lat, double lon, unsign
 }
 
 bool
-smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t bearing,
+smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t heading,
 			   uint8_t fix)
 {
 	struct buffer_s buf = { NULL, 0 };
 
-	char *page = smm_asset_build_position_url (asset->asset_id, latitude, longitude, altitude, bearing, fix);
+	char *page = smm_asset_build_position_url (asset->asset_id, latitude, longitude, altitude, heading, fix);
 	if (page == NULL)
 		{
 			return false;
