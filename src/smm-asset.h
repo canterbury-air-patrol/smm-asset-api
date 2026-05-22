@@ -350,10 +350,11 @@ void smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count);
 /**
  * Retrieve the most recent error recorded on a connection.
  *
- * The returned pointer is valid until the next call on the same connection.
- * The caller must not free it.  Returns NULL if connection is NULL.
+ * Returns a snapshot of the last error, copied under the connection lock.
+ * Safe to call concurrently with other library functions.
+ * Returns a zeroed smm_error (code == SMM_ERROR_NONE) if connection is NULL.
  *
  * @param connection the smm_connection to query
- * @return pointer to the last error, or NULL
+ * @return a copy of the last recorded error
  */
-const smm_error *smm_connection_get_last_error (smm_connection connection);
+smm_error smm_connection_get_last_error (smm_connection connection);
