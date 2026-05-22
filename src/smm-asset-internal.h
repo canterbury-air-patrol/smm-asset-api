@@ -142,3 +142,7 @@ char *smm_asset_build_position_url (long long asset_id, double lat, double lon, 
 void smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len);
 
 smm_search smm_parse_search_json (smm_asset asset, const char *data, size_t len);
+
+/* Returns true if https_redirect is an HTTPS upgrade of http_host to the
+ * same host:port — used to guard against redirect-based downgrade attacks. */
+bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect);

@@ -428,6 +428,53 @@ START_TEST (test_build_position_url_heading)
 }
 END_TEST
 
+START_TEST (test_https_upgrade_same_host)
+{
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", "https://example.com/login/"), true);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_same_host_with_port)
+{
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:8080", "https://example.com:8080/login/"),
+                      true);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_different_host)
+{
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", "https://evil.com/login/"), false);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_subdomain)
+{
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", "https://evil.example.com/login/"), false);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_different_port)
+{
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:80", "https://example.com:443/login/"),
+                      false);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_null_args)
+{
+    ck_assert_int_eq (smm_https_upgrade_is_same_host (NULL, "https://example.com/"), false);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", NULL), false);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_already_https)
+{
+    /* conn is already https — smm_https_upgrade_is_same_host must return false
+     * since http_host does not start with "http://" */
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("https://example.com", "https://example.com/login/"), false);
+}
+END_TEST
+
 START_TEST (test_curl_retrieve_url_r_returns_null_on_no_response)
 {
     /* Exercises the httpcode==0 cleanup path in smm_connection_curl_retrieve_url_r.
@@ -747,6 +794,13 @@ smm_suite (void)
     tc_conn = tcase_create ("Connection");
     tcase_add_test (tc_conn, test_curl_retrieve_url_r_returns_null_on_no_response);
     tcase_add_test (tc_conn, test_login_in_progress_reset_on_failure);
+    tcase_add_test (tc_conn, test_https_upgrade_same_host);
+    tcase_add_test (tc_conn, test_https_upgrade_same_host_with_port);
+    tcase_add_test (tc_conn, test_https_upgrade_different_host);
+    tcase_add_test (tc_conn, test_https_upgrade_subdomain);
+    tcase_add_test (tc_conn, test_https_upgrade_different_port);
+    tcase_add_test (tc_conn, test_https_upgrade_null_args);
+    tcase_add_test (tc_conn, test_https_upgrade_already_https);
     tcase_add_test (tc_conn, test_invalid_host);
     tcase_add_test (tc_conn, test_connect_null_host);
     tcase_add_test (tc_conn, test_connect_null_user);
