@@ -112,6 +112,7 @@ void smm_connection_ref (smm_connection conn);
 void smm_connection_unref (smm_connection conn);
 void smm_connection_set_error (smm_connection conn, smm_error_code code, const char *fmt, ...)
     __attribute__ ((format (printf, 3, 4)));
+void smm_connection_clear_error (smm_connection conn);
 
 void smm_curl_res_free (struct smm_curl_res_s *);
 /* Raw single-shot fetch: no retry, no login redirect, no HTTPS upgrade.
