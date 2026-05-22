@@ -577,6 +577,26 @@ smm_asset_connection_login (smm_connection connection)
     return res;
 }
 
+bool
+smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect)
+{
+    if (http_host == NULL || https_redirect == NULL)
+        return false;
+    if (strncmp (http_host, "http://", 7) != 0)
+        return false;
+    if (strncmp (https_redirect, "https://", 8) != 0)
+        return false;
+
+    const char *orig_host = http_host + 7;
+    const char *redir_host = https_redirect + 8;
+
+    /* Host ends at '/', '?', '#', or end of string */
+    size_t orig_len = strcspn (orig_host, "/?#");
+    size_t redir_len = strcspn (redir_host, "/?#");
+
+    return orig_len == redir_len && strncmp (orig_host, redir_host, orig_len) == 0;
+}
+
 struct smm_curl_res_s *
 smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
                                   size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata),
@@ -596,32 +616,20 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
             DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
             /* It's possible we need to upgrade to https */
             pthread_mutex_lock (&conn->lock);
-            if (strncmp (conn->host, "https://", 8) != 0 && strncmp (res->redirect_url, "https://", 8) == 0)
+            if (smm_https_upgrade_is_same_host (conn->host, res->redirect_url))
             {
-                /* Upgrade to https */
+                /* Upgrade to https — same host, just switch the scheme */
                 DEBUG ("Upgrading to https\n");
                 char *new_host = NULL;
-                if (strncmp (conn->host, "http://", 7) == 0)
-                {
-                    if (asprintf (&new_host, "https://%s", &conn->host[7]) < 0)
-                    {
-                        DEBUG ("Failed to create new "
-                               "host\n");
-                    }
-                }
-                else
-                {
-                    if (asprintf (&new_host, "https://%s", conn->host) < 0)
-                    {
-                        DEBUG ("Failed to create new "
-                               "host\n");
-                    }
-                }
-                if (new_host)
+                if (asprintf (&new_host, "https://%s", conn->host + 7) >= 0)
                 {
                     free (conn->host);
                     conn->host = new_host;
                     retry = true;
+                }
+                else
+                {
+                    DEBUG ("Failed to create new host\n");
                 }
             }
             pthread_mutex_unlock (&conn->lock);
