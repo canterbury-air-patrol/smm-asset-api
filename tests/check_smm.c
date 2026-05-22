@@ -285,6 +285,65 @@ START_TEST (test_search_accept_null_conn)
 }
 END_TEST
 
+START_TEST (test_search_accept_null_search)
+{
+    bool r = smm_search_accept (NULL);
+    ck_assert_int_eq (r, false);
+}
+END_TEST
+
+START_TEST (test_search_complete_null_search)
+{
+    bool r = smm_search_complete (NULL);
+    ck_assert_int_eq (r, false);
+}
+END_TEST
+
+START_TEST (test_search_get_waypoints_null_search)
+{
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool r = smm_search_get_waypoints (NULL, &waypoints, &count);
+    ck_assert_int_eq (r, false);
+}
+END_TEST
+
+START_TEST (test_report_position_null_asset)
+{
+    bool r = smm_asset_report_position (NULL, -43.5, 172.6, 100, 270, 3);
+    ck_assert_int_eq (r, false);
+}
+END_TEST
+
+START_TEST (test_get_search_null_asset)
+{
+    smm_search s = smm_asset_get_search (NULL, -43.5, 172.6);
+    ck_assert_ptr_null (s);
+}
+END_TEST
+
+START_TEST (test_last_command_null_asset)
+{
+    smm_asset_command cmd = smm_asset_last_command (NULL);
+    ck_assert_int_eq (cmd, SMM_COMMAND_UNKNOWN);
+}
+END_TEST
+
+START_TEST (test_last_goto_pos_null_asset)
+{
+    double lat = 1.0, lon = 2.0;
+    bool r = smm_asset_last_goto_pos (NULL, &lat, &lon);
+    ck_assert_int_eq (r, false);
+}
+END_TEST
+
+START_TEST (test_set_command_null_asset)
+{
+    /* must not crash */
+    smm_asset_set_command_from_plaintext (NULL, "Continue", 8);
+}
+END_TEST
+
 START_TEST (test_asset_outlives_connection)
 {
     smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
@@ -692,7 +751,12 @@ smm_suite (void)
     tcase_add_test (tc_position, test_set_command_from_plaintext_null);
     tcase_add_test (tc_position, test_set_command_from_plaintext_zero_length);
     tcase_add_test (tc_position, test_set_command_from_plaintext_with_trailing);
+    tcase_add_test (tc_position, test_set_command_null_asset);
     tcase_add_test (tc_position, test_report_position_null_conn);
+    tcase_add_test (tc_position, test_report_position_null_asset);
+    tcase_add_test (tc_position, test_last_command_null_asset);
+    tcase_add_test (tc_position, test_last_goto_pos_null_asset);
+    tcase_add_test (tc_position, test_get_search_null_asset);
     suite_add_tcase (s, tc_position);
 
     tc_csrf = tcase_create ("CSRF");
@@ -736,6 +800,9 @@ smm_suite (void)
 
     TCase *tc_search = tcase_create ("Search");
     tcase_add_test (tc_search, test_search_accept_null_conn);
+    tcase_add_test (tc_search, test_search_accept_null_search);
+    tcase_add_test (tc_search, test_search_complete_null_search);
+    tcase_add_test (tc_search, test_search_get_waypoints_null_search);
     tcase_add_test (tc_search, test_asset_outlives_connection);
     tcase_add_test (tc_search, test_search_sweep_width);
     tcase_add_test (tc_search, test_search_distance_and_length);
