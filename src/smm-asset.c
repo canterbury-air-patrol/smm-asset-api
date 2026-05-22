@@ -491,6 +491,10 @@ smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
 smm_asset_command
 smm_asset_last_command (smm_asset asset)
 {
+    if (!asset)
+    {
+        return SMM_COMMAND_UNKNOWN;
+    }
     smm_asset_command cmd;
     pthread_mutex_lock (&asset->lock);
     cmd = asset->last_command;
@@ -501,6 +505,10 @@ smm_asset_last_command (smm_asset asset)
 bool
 smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon)
 {
+    if (!asset)
+    {
+        return false;
+    }
     bool res = false;
     pthread_mutex_lock (&asset->lock);
     if (asset->last_command == SMM_COMMAND_GOTO)
@@ -522,6 +530,10 @@ smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon)
 void
 smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len)
 {
+    if (!asset)
+    {
+        return;
+    }
     pthread_mutex_lock (&asset->lock);
     if (data && len >= CONTINUE_LEN && strncmp (data, CONTINUE_STR, CONTINUE_LEN) == 0)
     {
@@ -552,6 +564,10 @@ bool
 smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t heading,
                            uint8_t fix)
 {
+    if (!asset)
+    {
+        return false;
+    }
     struct buffer_s buf = { NULL, 0 };
 
     char *page = smm_asset_build_position_url (asset->asset_id, latitude, longitude, altitude, heading, fix);
@@ -780,6 +796,10 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
 {
     struct buffer_s buf = { NULL, 0 };
 
+    if (!search)
+    {
+        return false;
+    }
     if (waypoints == NULL || waypoints_count == NULL)
     {
         return false;
@@ -821,6 +841,10 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
 static bool
 smm_search_action (smm_search search, const char *action)
 {
+    if (!search)
+    {
+        return false;
+    }
     char *action_page = NULL;
     struct buffer_s buf = { NULL, 0 };
 
@@ -938,6 +962,10 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
 smm_search
 smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 {
+    if (!asset)
+    {
+        return NULL;
+    }
     smm_search search = NULL;
     struct buffer_s buf = { NULL, 0 };
 
