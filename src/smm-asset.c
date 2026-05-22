@@ -136,14 +136,18 @@ smm_connection_set_error (smm_connection conn, smm_error_code code, const char *
     pthread_mutex_unlock (&conn->lock);
 }
 
-const smm_error *
+smm_error
 smm_connection_get_last_error (smm_connection connection)
 {
+    smm_error result = { SMM_ERROR_NONE, { 0 } };
     if (connection == NULL)
     {
-        return NULL;
+        return result;
     }
-    return &connection->last_error;
+    pthread_mutex_lock (&connection->lock);
+    result = connection->last_error;
+    pthread_mutex_unlock (&connection->lock);
+    return result;
 }
 
 void
