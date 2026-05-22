@@ -118,6 +118,18 @@ smm_asset_connection_tls_verify_set (smm_connection connection, bool verify)
 }
 
 void
+smm_connection_ref (smm_connection connection)
+{
+    if (connection == NULL)
+    {
+        return;
+    }
+    pthread_mutex_lock (&connection->lock);
+    connection->refcount++;
+    pthread_mutex_unlock (&connection->lock);
+}
+
+void
 smm_connection_unref (smm_connection connection)
 {
     if (connection == NULL)
@@ -161,6 +173,7 @@ smm_asset_create (smm_connection conn, const char *name, const char *type, long 
     }
 
     asset->conn = conn;
+    smm_connection_ref (conn);
     asset->name = name ? strdup (name) : NULL;
     asset->type = type ? strdup (type) : NULL;
 
@@ -300,6 +313,7 @@ smm_asset_free_asset (smm_asset asset)
 {
     if (asset)
     {
+        smm_connection_unref (asset->conn);
         free (asset->name);
         free (asset->type);
         pthread_mutex_destroy (&asset->lock);
@@ -315,12 +329,6 @@ smm_asset_free_assets (smm_assets assets, size_t assets_count)
         smm_asset_free_asset (assets[i]);
     }
     free (assets);
-}
-
-static long long
-smm_asset_get_asset_id (smm_asset asset)
-{
-    return asset->asset_id;
 }
 
 const char *
@@ -541,11 +549,17 @@ smm_search_create (smm_asset asset, const char *url, uint64_t length, uint64_t d
         return NULL;
     }
 
-    search->asset = asset;
-    search->url = url ? strdup (url) : NULL;
+    if (asset)
+    {
+        search->conn = asset->conn;
+        search->asset_id = asset->asset_id;
+        smm_connection_ref (asset->conn);
+    }
 
+    search->url = url ? strdup (url) : NULL;
     if (url && !search->url)
     {
+        smm_connection_unref (search->conn);
         free (search);
         return NULL;
     }
@@ -592,6 +606,7 @@ smm_search_destroy (smm_search search)
 {
     if (search)
     {
+        smm_connection_unref (search->conn);
         free (search->url);
         free (search);
     }
@@ -717,7 +732,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
     *waypoints_count = 0;
 
     struct smm_curl_res_s *res
-        = smm_connection_curl_retrieve_url (search->asset->conn, search->url, NULL, to_buffer, &buf, true);
+        = smm_connection_curl_retrieve_url (search->conn, search->url, NULL, to_buffer, &buf, true);
 
     if (res == NULL)
     {
@@ -744,13 +759,13 @@ smm_search_action (smm_search search, const char *action)
     char *action_page = NULL;
     struct buffer_s buf = { NULL, 0 };
 
-    if (asprintf (&action_page, "%s%s/?asset_id=%lli", search->url, action, smm_asset_get_asset_id (search->asset)) < 0)
+    if (asprintf (&action_page, "%s%s/?asset_id=%lli", search->url, action, search->asset_id) < 0)
     {
         return false;
     }
 
     struct smm_curl_res_s *res
-        = smm_connection_curl_retrieve_url (search->asset->conn, action_page, NULL, to_buffer, &buf, false);
+        = smm_connection_curl_retrieve_url (search->conn, action_page, NULL, to_buffer, &buf, false);
     if (res == NULL)
     {
         free (action_page);

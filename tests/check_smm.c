@@ -274,18 +274,28 @@ END_TEST
 
 START_TEST (test_search_accept_null_conn)
 {
-    struct smm_asset_s asset_s;
-    memset (&asset_s, 0, sizeof (asset_s));
-    asset_s.asset_id = 1;
-    pthread_mutex_init (&asset_s.lock, NULL);
     struct smm_search_s search_s;
     memset (&search_s, 0, sizeof (search_s));
-    search_s.asset = &asset_s;
+    search_s.conn = NULL;
+    search_s.asset_id = 1;
     search_s.url = strdup ("/search/1/");
     bool r = smm_search_accept (&search_s);
     ck_assert_int_eq (r, false);
     free (search_s.url);
-    pthread_mutex_destroy (&asset_s.lock);
+}
+END_TEST
+
+START_TEST (test_asset_outlives_connection)
+{
+    smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+    smm_connection_close (conn);
+    /* asset holds its own reference; the connection must not be freed yet */
+    ck_assert_str_eq (smm_asset_name (asset), "A");
+    smm_asset_free_asset (asset);
+    /* connection is freed here when asset's ref is dropped — no double-free */
 }
 END_TEST
 
@@ -671,6 +681,7 @@ smm_suite (void)
 
     TCase *tc_search = tcase_create ("Search");
     tcase_add_test (tc_search, test_search_accept_null_conn);
+    tcase_add_test (tc_search, test_asset_outlives_connection);
     tcase_add_test (tc_search, test_search_sweep_width);
     tcase_add_test (tc_search, test_search_distance_and_length);
     tcase_add_test (tc_search, test_get_search_absolute_url_ignored);
