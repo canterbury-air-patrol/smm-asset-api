@@ -511,6 +511,39 @@ START_TEST (test_waypoint_parsing_integer_coords)
 }
 END_TEST
 
+START_TEST (test_waypoints_parsing_missing_geometry)
+{
+    const char *json = "{\"features\": [{\"properties\": {}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_missing_coordinates)
+{
+    const char *json = "{\"features\": [{\"geometry\": {\"type\": \"LineString\"}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_no_features_key)
+{
+    const char *json = "{\"type\": \"FeatureCollection\"}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
 START_TEST (test_asset_last_goto_pos_not_goto)
 {
     smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
@@ -677,6 +710,9 @@ smm_suite (void)
     tcase_add_test (tc_waypoints, test_waypoints_parsing_empty_features);
     tcase_add_test (tc_waypoints, test_waypoints_parsing_multiple_features);
     tcase_add_test (tc_waypoints, test_waypoint_parsing_integer_coords);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_missing_geometry);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_missing_coordinates);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_no_features_key);
     suite_add_tcase (s, tc_waypoints);
 
     TCase *tc_search = tcase_create ("Search");
