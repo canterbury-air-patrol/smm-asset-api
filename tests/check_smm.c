@@ -630,6 +630,23 @@ START_TEST (test_connection_login_fields_initialised)
 }
 END_TEST
 
+START_TEST (test_get_last_error_null_connection)
+{
+    ck_assert_ptr_null (smm_connection_get_last_error (NULL));
+}
+END_TEST
+
+START_TEST (test_get_last_error_initial)
+{
+    smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    const smm_error *err = smm_connection_get_last_error (conn);
+    ck_assert_ptr_nonnull (err);
+    ck_assert_int_eq (err->code, SMM_ERROR_NONE);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_get_state_null_connection)
 {
     ck_assert_int_eq (smm_asset_connection_get_state (NULL), SMM_CONNECTION_UNKNOWN);
@@ -661,6 +678,8 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_connect_null_user);
     tcase_add_test (tc_conn, test_connect_null_pass);
     tcase_add_test (tc_conn, test_connection_login_fields_initialised);
+    tcase_add_test (tc_conn, test_get_last_error_null_connection);
+    tcase_add_test (tc_conn, test_get_last_error_initial);
     tcase_add_test (tc_conn, test_get_state_null_connection);
     tcase_add_test (tc_conn, test_get_state_initial);
     tcase_add_test (tc_conn, test_debugging_set);

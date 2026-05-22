@@ -24,6 +24,7 @@
 #include "smm-asset-internal.h"
 
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -115,6 +116,32 @@ smm_asset_connection_tls_verify_set (smm_connection connection, bool verify)
         connection->verify_tls = verify;
         pthread_mutex_unlock (&connection->lock);
     }
+}
+
+void
+smm_connection_set_error (smm_connection conn, smm_error_code code, const char *fmt, ...)
+{
+    if (conn == NULL)
+    {
+        return;
+    }
+    pthread_mutex_lock (&conn->lock);
+    conn->last_error.code = code;
+    va_list ap;
+    va_start (ap, fmt);
+    vsnprintf (conn->last_error.message, sizeof (conn->last_error.message), fmt, ap);
+    va_end (ap);
+    pthread_mutex_unlock (&conn->lock);
+}
+
+const smm_error *
+smm_connection_get_last_error (smm_connection connection)
+{
+    if (connection == NULL)
+    {
+        return NULL;
+    }
+    return &connection->last_error;
 }
 
 void
@@ -292,10 +319,12 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
     if (res == NULL)
     {
+        smm_connection_set_error (connection, SMM_ERROR_NETWORK, "network failure fetching /assets/");
         return false;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
+        smm_connection_set_error (connection, SMM_ERROR_SERVER, "unexpected HTTP %ld from /assets/", res->httpcode);
         smm_curl_res_free (res);
         free (buf.data);
         return false;
@@ -303,6 +332,10 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
     smm_curl_res_free (res);
 
     bool parse_res = smm_parse_assets (connection, buf.data, buf.bytes, assets, assets_count);
+    if (!parse_res)
+    {
+        smm_connection_set_error (connection, SMM_ERROR_PARSE, "failed to parse /assets/ response");
+    }
 
     free (buf.data);
     return parse_res;
@@ -510,11 +543,14 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
     if (res == NULL)
     {
+        smm_connection_set_error (asset->conn, SMM_ERROR_NETWORK, "network failure reporting position");
         free (page);
         return false;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
+        smm_connection_set_error (asset->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld from position report",
+                                  res->httpcode);
         smm_curl_res_free (res);
         free (page);
         free (buf.data);
@@ -883,12 +919,14 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
     if (res == NULL)
     {
+        smm_connection_set_error (asset->conn, SMM_ERROR_NETWORK, "network failure fetching closest search");
         free (page);
         return NULL;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
-        /* login and try again */
+        smm_connection_set_error (asset->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching closest search",
+                                  res->httpcode);
         smm_curl_res_free (res);
         free (page);
         free (buf.data);
