@@ -27,6 +27,29 @@
 #include <stdint.h>
 
 /**
+ * @section thread_safety Thread-safety guarantees
+ *
+ * - A single smm_connection may be shared across threads.  All functions that
+ *   operate on an smm_connection are internally serialised with a mutex.
+ *
+ * - smm_asset_connect() and smm_connection_close() are safe to call from any
+ *   thread, but smm_connection_close() must not be called while another thread
+ *   is still creating assets or searches from the same connection.
+ *   smm_asset_create() acquires a reference on the connection, so closing the
+ *   connection before freeing all assets is safe.
+ *
+ * - Each smm_asset is owned by a single thread at a time.  Two threads must
+ *   not call functions on the same asset concurrently.
+ *
+ * - Each smm_search is owned by a single thread at a time.  Two threads must
+ *   not call functions on the same search concurrently.
+ *
+ * - smm_asset_debugging_set() must be called before any other threads are
+ *   started; the smm_debug flag is declared _Atomic but toggling it after
+ *   threads are running may produce interleaved debug output.
+ */
+
+/**
  * An opaque object for accessing the smm
  */
 typedef struct smm_connection_s *smm_connection;
