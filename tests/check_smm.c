@@ -91,6 +91,20 @@ START_TEST (test_assets_parsing_invalid)
 }
 END_TEST
 
+START_TEST (test_assets_parsing_missing_id)
+{
+    const char *json = "{\"assets\": [{\"type_id\": 2, \"name\": \"Asset 1\", \"type_name\": \"Type 1\"}]}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets (NULL, json, strlen (json), &assets, &count);
+
+    ck_assert_uint_eq (res, true);
+    ck_assert_uint_eq (count, 1);
+    ck_assert_str_eq (smm_asset_name (assets[0]), "Asset 1");
+    smm_asset_free_assets (assets, count);
+}
+END_TEST
+
 START_TEST (test_command_parsing_goto)
 {
     const char *json = "{\"action\": \"GOTO\", \"latitude\": -43.5, \"longitude\": 172.6}";
@@ -616,6 +630,7 @@ smm_suite (void)
     tcase_add_test (tc_assets, test_assets_parsing);
     tcase_add_test (tc_assets, test_assets_parsing_empty);
     tcase_add_test (tc_assets, test_assets_parsing_invalid);
+    tcase_add_test (tc_assets, test_assets_parsing_missing_id);
     suite_add_tcase (s, tc_assets);
 
     TCase *tc_commands = tcase_create ("Commands");
