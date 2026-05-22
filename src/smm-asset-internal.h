@@ -38,6 +38,9 @@ enum http_return_codes
     HTTP_SEE_OTHER = 303,
 };
 
+#define SMM_CURL_CONNECT_TIMEOUT_SECS 30L
+#define SMM_CURL_TRANSFER_TIMEOUT_SECS 60L
+
 extern _Atomic bool smm_debug;
 #define DEBUG(...)                                                                                                     \
     do                                                                                                                 \
