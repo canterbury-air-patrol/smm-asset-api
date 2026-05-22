@@ -57,6 +57,8 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
     conn->pass = strdup (pass);
     conn->verify_tls = true;
     conn->refcount = 1;
+    conn->last_error.code = SMM_ERROR_NONE;
+    conn->last_error.message[0] = '\0';
 
     if (!conn->host || !conn->user || !conn->pass)
     {
