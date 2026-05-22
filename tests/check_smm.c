@@ -428,6 +428,20 @@ START_TEST (test_build_position_url_heading)
 }
 END_TEST
 
+START_TEST (test_curl_retrieve_url_r_returns_null_on_no_response)
+{
+    /* Exercises the httpcode==0 cleanup path in smm_connection_curl_retrieve_url_r.
+     * Port 19999 is chosen to be connection-refused (fast) rather than a
+     * timeout. The function must return NULL and free all internal state
+     * (ASAN/Valgrind will catch any leak of content_type or redirect_url). */
+    smm_connection conn = smm_asset_connect ("http://127.0.0.1:19999/", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url_r (conn, "/test/", NULL, NULL, NULL, false);
+    ck_assert_ptr_null (res);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_login_in_progress_reset_on_failure)
 {
     /* login_in_progress must be false after a failed attempt so no caller
@@ -731,6 +745,7 @@ smm_suite (void)
     s = suite_create ("SMM");
 
     tc_conn = tcase_create ("Connection");
+    tcase_add_test (tc_conn, test_curl_retrieve_url_r_returns_null_on_no_response);
     tcase_add_test (tc_conn, test_login_in_progress_reset_on_failure);
     tcase_add_test (tc_conn, test_invalid_host);
     tcase_add_test (tc_conn, test_connect_null_host);
