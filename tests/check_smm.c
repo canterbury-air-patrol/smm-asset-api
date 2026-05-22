@@ -428,6 +428,15 @@ START_TEST (test_build_position_url_heading)
 }
 END_TEST
 
+START_TEST (test_curl_timeout_constants)
+{
+    /* Verify timeout macros are positive and connect <= transfer */
+    ck_assert_int_gt (SMM_CURL_CONNECT_TIMEOUT_SECS, 0);
+    ck_assert_int_gt (SMM_CURL_TRANSFER_TIMEOUT_SECS, 0);
+    ck_assert_int_le (SMM_CURL_CONNECT_TIMEOUT_SECS, SMM_CURL_TRANSFER_TIMEOUT_SECS);
+}
+END_TEST
+
 START_TEST (test_https_upgrade_same_host)
 {
     ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", "https://example.com/login/"), true);
@@ -800,6 +809,7 @@ smm_suite (void)
     s = suite_create ("SMM");
 
     tc_conn = tcase_create ("Connection");
+    tcase_add_test (tc_conn, test_curl_timeout_constants);
     tcase_add_test (tc_conn, test_curl_retrieve_url_r_returns_null_on_no_response);
     tcase_add_test (tc_conn, test_login_in_progress_reset_on_failure);
     tcase_add_test (tc_conn, test_https_upgrade_same_host);

@@ -222,6 +222,8 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, verify_tls ? 2L : 0L);
     curl_easy_setopt (curl, CURLOPT_COOKIEFILE, "");
     curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 0L);
+    curl_easy_setopt (curl, CURLOPT_CONNECTTIMEOUT, SMM_CURL_CONNECT_TIMEOUT_SECS);
+    curl_easy_setopt (curl, CURLOPT_TIMEOUT, SMM_CURL_TRANSFER_TIMEOUT_SECS);
     curl_easy_setopt (curl, CURLOPT_URL, res->full_uri);
 
     if (post_data)
