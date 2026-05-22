@@ -327,8 +327,7 @@ out:
     }
     if (res && !res->success && res->httpcode == 0)
     {
-        free (res->full_uri);
-        free (res);
+        smm_curl_res_free (res);
         res = NULL;
     }
 
