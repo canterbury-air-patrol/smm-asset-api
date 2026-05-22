@@ -136,6 +136,19 @@ smm_connection_set_error (smm_connection conn, smm_error_code code, const char *
     pthread_mutex_unlock (&conn->lock);
 }
 
+void
+smm_connection_clear_error (smm_connection conn)
+{
+    if (conn == NULL)
+    {
+        return;
+    }
+    pthread_mutex_lock (&conn->lock);
+    conn->last_error.code = SMM_ERROR_NONE;
+    conn->last_error.message[0] = '\0';
+    pthread_mutex_unlock (&conn->lock);
+}
+
 smm_error
 smm_connection_get_last_error (smm_connection connection)
 {
@@ -321,6 +334,7 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
 
     *assets = NULL;
     *assets_count = 0;
+    smm_connection_clear_error (connection);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
     if (res == NULL)
@@ -545,6 +559,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
     {
         return false;
     }
+    smm_connection_clear_error (asset->conn);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
     if (res == NULL)
@@ -772,6 +787,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
 
     *waypoints = NULL;
     *waypoints_count = 0;
+    smm_connection_clear_error (search->conn);
 
     struct smm_curl_res_s *res
         = smm_connection_curl_retrieve_url (search->conn, search->url, NULL, to_buffer, &buf, true);
@@ -805,6 +821,7 @@ smm_search_action (smm_search search, const char *action)
     {
         return false;
     }
+    smm_connection_clear_error (search->conn);
 
     struct smm_curl_res_s *res
         = smm_connection_curl_retrieve_url (search->conn, action_page, NULL, to_buffer, &buf, false);
@@ -921,6 +938,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     {
         return NULL;
     }
+    smm_connection_clear_error (asset->conn);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
     if (res == NULL)
