@@ -535,8 +535,8 @@ smm_asset_connection_login (smm_connection connection)
 
     tidyBufFree (&docbuf);
 
-    /* Publish the CSRF token and state under the lock, then release the
-     * login flag and wake any waiters. */
+    /* Publish the CSRF token, state, and last_error under the lock so that
+     * readers always see a consistent view of all three fields. */
     pthread_mutex_lock (&connection->lock);
     if (csrf_token)
     {
@@ -544,6 +544,33 @@ smm_asset_connection_login (smm_connection connection)
         connection->csrfmiddlewaretoken = csrf_token;
     }
     connection->state = new_state;
+    switch (new_state)
+    {
+        case SMM_CONNECTION_CONNECTED:
+            connection->last_error.code = SMM_ERROR_NONE;
+            connection->last_error.message[0] = '\0';
+            break;
+        case SMM_CONNECTION_AUTHENTICATION_FAILURE:
+            connection->last_error.code = SMM_ERROR_AUTH;
+            snprintf (connection->last_error.message, sizeof (connection->last_error.message),
+                      "authentication failed");
+            break;
+        case SMM_CONNECTION_PROTOCOL_ERROR:
+            connection->last_error.code = SMM_ERROR_PROTOCOL;
+            snprintf (connection->last_error.message, sizeof (connection->last_error.message),
+                      "CSRF token not found in login page");
+            break;
+        case SMM_CONNECTION_NO_HOST_CONNECTION:
+            connection->last_error.code = SMM_ERROR_NETWORK;
+            snprintf (connection->last_error.message, sizeof (connection->last_error.message),
+                      "network failure fetching login page");
+            break;
+        default:
+            connection->last_error.code = SMM_ERROR_SERVER;
+            snprintf (connection->last_error.message, sizeof (connection->last_error.message),
+                      "login failed");
+            break;
+    }
     connection->login_in_progress = false;
     pthread_cond_broadcast (&connection->login_cond);
     pthread_mutex_unlock (&connection->lock);
