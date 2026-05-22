@@ -79,7 +79,8 @@ struct smm_asset_s
 
 struct smm_search_s
 {
-    smm_asset asset;
+    smm_connection conn;  /* owns a reference; acquired in smm_search_create */
+    long long asset_id;   /* cached from the creating asset */
     char *url;
     uint64_t distance;
     uint64_t length;
@@ -106,6 +107,7 @@ size_t to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata);
 bool smm_connection_share_init (smm_connection conn);
 void smm_connection_share_destroy (smm_connection conn);
 
+void smm_connection_ref (smm_connection conn);
 void smm_connection_unref (smm_connection conn);
 
 void smm_curl_res_free (struct smm_curl_res_s *);
