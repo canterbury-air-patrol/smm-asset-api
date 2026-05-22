@@ -27,6 +27,29 @@
 #include <stdint.h>
 
 /**
+ * Error codes returned by smm_connection_get_last_error()
+ */
+typedef enum
+{
+    SMM_ERROR_NONE = 0,         /*!< No error */
+    SMM_ERROR_NETWORK,          /*!< Network or connection failure */
+    SMM_ERROR_AUTH,             /*!< Authentication failure */
+    SMM_ERROR_PROTOCOL,         /*!< Unexpected or malformed response */
+    SMM_ERROR_PARSE,            /*!< JSON or HTML parse failure */
+    SMM_ERROR_INVALID_ARG,      /*!< Invalid argument (e.g. NULL pointer) */
+    SMM_ERROR_SERVER,           /*!< Server returned an unexpected HTTP status */
+} smm_error_code;
+
+/**
+ * Structured error detail attached to an smm_connection.
+ */
+typedef struct
+{
+    smm_error_code code;  /*!< Machine-readable error code */
+    char message[256];    /*!< Human-readable description */
+} smm_error;
+
+/**
  * @section thread_safety Thread-safety guarantees
  *
  * - A single smm_connection may be shared across threads.  All functions that
@@ -323,3 +346,14 @@ void smm_search_destroy (smm_search search);
  * @param waypoints_count the number of waypoints
  */
 void smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count);
+
+/**
+ * Retrieve the most recent error recorded on a connection.
+ *
+ * The returned pointer is valid until the next call on the same connection.
+ * The caller must not free it.  Returns NULL if connection is NULL.
+ *
+ * @param connection the smm_connection to query
+ * @return pointer to the last error, or NULL
+ */
+const smm_error *smm_connection_get_last_error (smm_connection connection);
