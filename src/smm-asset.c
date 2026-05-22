@@ -794,10 +794,13 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
 
     if (res == NULL)
     {
+        smm_connection_set_error (search->conn, SMM_ERROR_NETWORK, "network failure fetching waypoints");
         return false;
     }
     else if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
+        smm_connection_set_error (search->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching waypoints",
+                                  res->httpcode);
         smm_curl_res_free (res);
         free (buf.data);
         return false;
@@ -805,6 +808,10 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
     smm_curl_res_free (res);
 
     bool parse_res = smm_parse_waypoints (buf.data, buf.bytes, waypoints, waypoints_count);
+    if (!parse_res)
+    {
+        smm_connection_set_error (search->conn, SMM_ERROR_PARSE, "failed to parse waypoints response");
+    }
 
     free (buf.data);
 
@@ -827,11 +834,14 @@ smm_search_action (smm_search search, const char *action)
         = smm_connection_curl_retrieve_url (search->conn, action_page, NULL, to_buffer, &buf, false);
     if (res == NULL)
     {
+        smm_connection_set_error (search->conn, SMM_ERROR_NETWORK, "network failure sending %s action", action);
         free (action_page);
         return false;
     }
     else if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
+        smm_connection_set_error (search->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld from %s action", res->httpcode,
+                                  action);
         smm_curl_res_free (res);
         free (action_page);
         free (buf.data);
