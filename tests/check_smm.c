@@ -119,6 +119,20 @@ START_TEST (test_command_parsing_goto_integer_coords)
 }
 END_TEST
 
+START_TEST (test_command_parsing_goto_mixed_lat_real_lon_int)
+{
+    const char *json = "{\"action\": \"GOTO\", \"latitude\": -43.75, \"longitude\": 172}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+
+    ck_assert_uint_eq (res, true);
+    ck_assert_int_eq (cmd, SMM_COMMAND_GOTO);
+    ck_assert_ldouble_eq_tol (lat, -43.75, 0.0001);
+    ck_assert_ldouble_eq_tol (lon, 172.0, 0.0001);
+}
+END_TEST
+
 START_TEST (test_command_parsing_goto_mixed_lat_int_lon_real)
 {
     const char *json = "{\"action\": \"GOTO\", \"latitude\": -43, \"longitude\": 172.5}";
@@ -607,6 +621,7 @@ smm_suite (void)
     TCase *tc_commands = tcase_create ("Commands");
     tcase_add_test (tc_commands, test_command_parsing_goto);
     tcase_add_test (tc_commands, test_command_parsing_goto_integer_coords);
+    tcase_add_test (tc_commands, test_command_parsing_goto_mixed_lat_real_lon_int);
     tcase_add_test (tc_commands, test_command_parsing_goto_mixed_lat_int_lon_real);
     tcase_add_test (tc_commands, test_command_parsing_rtl);
     tcase_add_test (tc_commands, test_command_parsing_circle);
