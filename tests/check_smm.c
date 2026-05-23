@@ -467,6 +467,14 @@ START_TEST (test_https_upgrade_null_args)
 }
 END_TEST
 
+START_TEST (test_https_upgrade_non_http_http_host)
+{
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("ftp://example.com", "https://example.com/"), false);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("example.com", "https://example.com/"), false);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("", "https://example.com/"), false);
+}
+END_TEST
+
 START_TEST (test_https_upgrade_already_https)
 {
     /* conn is already https — smm_https_upgrade_is_same_host must return false
@@ -800,6 +808,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_https_upgrade_subdomain);
     tcase_add_test (tc_conn, test_https_upgrade_different_port);
     tcase_add_test (tc_conn, test_https_upgrade_null_args);
+    tcase_add_test (tc_conn, test_https_upgrade_non_http_http_host);
     tcase_add_test (tc_conn, test_https_upgrade_already_https);
     tcase_add_test (tc_conn, test_invalid_host);
     tcase_add_test (tc_conn, test_connect_null_host);
