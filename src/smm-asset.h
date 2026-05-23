@@ -350,6 +350,11 @@ void smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count);
 /**
  * Retrieve the most recent error recorded on a connection.
  *
+ * Only reflects errors from connection-level operations: login and
+ * smm_asset_get_assets.  Asset-level and search-level errors are
+ * stored on the respective asset or search object; use
+ * smm_asset_get_last_error() and smm_search_get_last_error() instead.
+ *
  * Returns a snapshot of the last error, copied under the connection lock.
  * Safe to call concurrently with other library functions.
  * Returns a zeroed smm_error (code == SMM_ERROR_NONE) if connection is NULL.
@@ -358,3 +363,33 @@ void smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count);
  * @return a copy of the last recorded error
  */
 smm_error smm_connection_get_last_error (smm_connection connection);
+
+/**
+ * Retrieve the most recent error recorded on an asset.
+ *
+ * Reflects errors from smm_asset_report_position() and
+ * smm_asset_get_search().  The error is stored per-asset so concurrent
+ * operations on different assets sharing the same connection do not
+ * clobber each other's error state.
+ *
+ * Returns a zeroed smm_error (code == SMM_ERROR_NONE) if asset is NULL.
+ *
+ * @param asset the smm_asset to query
+ * @return a copy of the last recorded error
+ */
+smm_error smm_asset_get_last_error (smm_asset asset);
+
+/**
+ * Retrieve the most recent error recorded on a search.
+ *
+ * Reflects errors from smm_search_get_waypoints(), smm_search_accept(),
+ * and smm_search_complete().  The error is stored per-search so
+ * concurrent operations on different searches sharing the same connection
+ * do not clobber each other's error state.
+ *
+ * Returns a zeroed smm_error (code == SMM_ERROR_NONE) if search is NULL.
+ *
+ * @param search the smm_search to query
+ * @return a copy of the last recorded error
+ */
+smm_error smm_search_get_last_error (smm_search search);

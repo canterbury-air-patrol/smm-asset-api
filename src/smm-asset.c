@@ -120,6 +120,73 @@ smm_asset_connection_tls_verify_set (smm_connection connection, bool verify)
     }
 }
 
+static void
+smm_asset_set_error (smm_asset asset, smm_error_code code, const char *fmt, ...)
+{
+    if (asset == NULL)
+        return;
+    pthread_mutex_lock (&asset->lock);
+    asset->last_error.code = code;
+    va_list ap;
+    va_start (ap, fmt);
+    vsnprintf (asset->last_error.message, sizeof (asset->last_error.message), fmt, ap);
+    va_end (ap);
+    pthread_mutex_unlock (&asset->lock);
+}
+
+static void
+smm_asset_clear_error (smm_asset asset)
+{
+    if (asset == NULL)
+        return;
+    pthread_mutex_lock (&asset->lock);
+    asset->last_error.code = SMM_ERROR_NONE;
+    asset->last_error.message[0] = '\0';
+    pthread_mutex_unlock (&asset->lock);
+}
+
+smm_error
+smm_asset_get_last_error (smm_asset asset)
+{
+    smm_error result = { SMM_ERROR_NONE, { 0 } };
+    if (asset == NULL)
+        return result;
+    pthread_mutex_lock (&asset->lock);
+    result = asset->last_error;
+    pthread_mutex_unlock (&asset->lock);
+    return result;
+}
+
+static void
+smm_search_set_error (smm_search search, smm_error_code code, const char *fmt, ...)
+{
+    if (search == NULL)
+        return;
+    search->last_error.code = code;
+    va_list ap;
+    va_start (ap, fmt);
+    vsnprintf (search->last_error.message, sizeof (search->last_error.message), fmt, ap);
+    va_end (ap);
+}
+
+static void
+smm_search_clear_error (smm_search search)
+{
+    if (search == NULL)
+        return;
+    search->last_error.code = SMM_ERROR_NONE;
+    search->last_error.message[0] = '\0';
+}
+
+smm_error
+smm_search_get_last_error (smm_search search)
+{
+    smm_error result = { SMM_ERROR_NONE, { 0 } };
+    if (search == NULL)
+        return result;
+    return search->last_error;
+}
+
 void
 smm_connection_set_error (smm_connection conn, smm_error_code code, const char *fmt, ...)
 {
@@ -591,19 +658,18 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
     {
         return false;
     }
-    smm_connection_clear_error (asset->conn);
+    smm_asset_clear_error (asset);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
     if (res == NULL)
     {
-        smm_connection_set_error (asset->conn, SMM_ERROR_NETWORK, "network failure reporting position");
+        smm_asset_set_error (asset, SMM_ERROR_NETWORK, "network failure reporting position");
         free (page);
         return false;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
-        smm_connection_set_error (asset->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld from position report",
-                                  res->httpcode);
+        smm_asset_set_error (asset, SMM_ERROR_SERVER, "unexpected HTTP %ld from position report", res->httpcode);
         smm_curl_res_free (res);
         free (page);
         free (buf.data);
@@ -823,20 +889,19 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
 
     *waypoints = NULL;
     *waypoints_count = 0;
-    smm_connection_clear_error (search->conn);
+    smm_search_clear_error (search);
 
     struct smm_curl_res_s *res
         = smm_connection_curl_retrieve_url (search->conn, search->url, NULL, to_buffer, &buf, true);
 
     if (res == NULL)
     {
-        smm_connection_set_error (search->conn, SMM_ERROR_NETWORK, "network failure fetching waypoints");
+        smm_search_set_error (search, SMM_ERROR_NETWORK, "network failure fetching waypoints");
         return false;
     }
     else if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
-        smm_connection_set_error (search->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching waypoints",
-                                  res->httpcode);
+        smm_search_set_error (search, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching waypoints", res->httpcode);
         smm_curl_res_free (res);
         free (buf.data);
         return false;
@@ -846,7 +911,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
     bool parse_res = smm_parse_waypoints (buf.data, buf.bytes, waypoints, waypoints_count);
     if (!parse_res)
     {
-        smm_connection_set_error (search->conn, SMM_ERROR_PARSE, "failed to parse waypoints response");
+        smm_search_set_error (search, SMM_ERROR_PARSE, "failed to parse waypoints response");
     }
 
     free (buf.data);
@@ -868,20 +933,19 @@ smm_search_action (smm_search search, const char *action)
     {
         return false;
     }
-    smm_connection_clear_error (search->conn);
+    smm_search_clear_error (search);
 
     struct smm_curl_res_s *res
         = smm_connection_curl_retrieve_url (search->conn, action_page, NULL, to_buffer, &buf, false);
     if (res == NULL)
     {
-        smm_connection_set_error (search->conn, SMM_ERROR_NETWORK, "network failure sending %s action", action);
+        smm_search_set_error (search, SMM_ERROR_NETWORK, "network failure sending %s action", action);
         free (action_page);
         return false;
     }
     else if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
-        smm_connection_set_error (search->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld from %s action", res->httpcode,
-                                  action);
+        smm_search_set_error (search, SMM_ERROR_SERVER, "unexpected HTTP %ld from %s action", res->httpcode, action);
         smm_curl_res_free (res);
         free (action_page);
         free (buf.data);
@@ -992,19 +1056,18 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     {
         return NULL;
     }
-    smm_connection_clear_error (asset->conn);
+    smm_asset_clear_error (asset);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
     if (res == NULL)
     {
-        smm_connection_set_error (asset->conn, SMM_ERROR_NETWORK, "network failure fetching closest search");
+        smm_asset_set_error (asset, SMM_ERROR_NETWORK, "network failure fetching closest search");
         free (page);
         return NULL;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
-        smm_connection_set_error (asset->conn, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching closest search",
-                                  res->httpcode);
+        smm_asset_set_error (asset, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching closest search", res->httpcode);
         smm_curl_res_free (res);
         free (page);
         free (buf.data);
