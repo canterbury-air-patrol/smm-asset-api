@@ -428,6 +428,79 @@ START_TEST (test_build_position_url_heading)
 }
 END_TEST
 
+START_TEST (test_url_path_safe_valid)
+{
+    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/"), true);
+    ck_assert_int_eq (smm_url_path_is_safe ("/search/42/begin/"), true);
+    ck_assert_int_eq (smm_url_path_is_safe ("/"), true);
+}
+END_TEST
+
+START_TEST (test_url_path_safe_dotdot)
+{
+    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/../../admin/"), false);
+    ck_assert_int_eq (smm_url_path_is_safe ("/.."), false);
+}
+END_TEST
+
+START_TEST (test_url_path_safe_query)
+{
+    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/?injected=evil"), false);
+}
+END_TEST
+
+START_TEST (test_url_path_safe_fragment)
+{
+    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/#frag"), false);
+}
+END_TEST
+
+START_TEST (test_url_path_safe_encoded)
+{
+    ck_assert_int_eq (smm_url_path_is_safe ("/search/%2e%2e/admin/"), false);
+}
+END_TEST
+
+START_TEST (test_url_path_safe_absolute)
+{
+    ck_assert_int_eq (smm_url_path_is_safe ("http://example.com/search/1/"), false);
+    ck_assert_int_eq (smm_url_path_is_safe ("https://example.com/search/1/"), false);
+}
+END_TEST
+
+START_TEST (test_url_path_safe_null)
+{
+    ck_assert_int_eq (smm_url_path_is_safe (NULL), false);
+}
+END_TEST
+
+START_TEST (test_get_search_dotdot_url_rejected)
+{
+    const char *json = "{\"object_url\": \"/search/1/../../admin/\", \"distance\": 10, \"length\": 100, "
+                       "\"sweep_width\": 50}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_null (search);
+}
+END_TEST
+
+START_TEST (test_get_search_query_url_rejected)
+{
+    const char *json
+        = "{\"object_url\": \"/search/1/?injected=x\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_null (search);
+}
+END_TEST
+
+START_TEST (test_get_search_encoded_url_rejected)
+{
+    const char *json = "{\"object_url\": \"/search/%2e%2e/admin/\", \"distance\": 10, \"length\": 100, "
+                       "\"sweep_width\": 50}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_null (search);
+}
+END_TEST
+
 START_TEST (test_curl_timeout_constants)
 {
     /* Verify timeout macros are positive and connect <= transfer */
@@ -899,7 +972,20 @@ smm_suite (void)
     tcase_add_test (tc_search, test_get_search_nonstring_object_url_returns_null);
     tcase_add_test (tc_search, test_get_search_missing_object_url_returns_null);
     tcase_add_test (tc_search, test_get_search_relative_url_accepted);
+    tcase_add_test (tc_search, test_get_search_dotdot_url_rejected);
+    tcase_add_test (tc_search, test_get_search_query_url_rejected);
+    tcase_add_test (tc_search, test_get_search_encoded_url_rejected);
     suite_add_tcase (s, tc_search);
+
+    TCase *tc_url = tcase_create ("URL");
+    tcase_add_test (tc_url, test_url_path_safe_valid);
+    tcase_add_test (tc_url, test_url_path_safe_dotdot);
+    tcase_add_test (tc_url, test_url_path_safe_query);
+    tcase_add_test (tc_url, test_url_path_safe_fragment);
+    tcase_add_test (tc_url, test_url_path_safe_encoded);
+    tcase_add_test (tc_url, test_url_path_safe_absolute);
+    tcase_add_test (tc_url, test_url_path_safe_null);
+    suite_add_tcase (s, tc_url);
 
     TCase *tc_position_ext = tcase_create ("PositionExt");
     tcase_add_test (tc_position_ext, test_build_position_url_values);

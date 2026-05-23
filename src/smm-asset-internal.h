@@ -149,3 +149,8 @@ smm_search smm_parse_search_json (smm_asset asset, const char *data, size_t len)
 /* Returns true if https_redirect is an HTTPS upgrade of http_host to the
  * same host:port — used to guard against redirect-based downgrade attacks. */
 bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect);
+
+/* Returns true if url is a safe relative path: starts with '/', contains
+ * no '..' segments, no query ('?'), no fragment ('#'), and no percent-
+ * encoded characters ('%'). */
+bool smm_url_path_is_safe (const char *url);
