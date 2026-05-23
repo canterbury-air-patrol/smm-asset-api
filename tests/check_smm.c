@@ -428,6 +428,71 @@ START_TEST (test_build_position_url_heading)
 }
 END_TEST
 
+START_TEST (test_asset_get_last_error_null)
+{
+    smm_error err = smm_asset_get_last_error (NULL);
+    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+}
+END_TEST
+
+START_TEST (test_asset_get_last_error_initial)
+{
+    smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+    smm_error err = smm_asset_get_last_error (asset);
+    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_search_get_last_error_null)
+{
+    smm_error err = smm_search_get_last_error (NULL);
+    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+}
+END_TEST
+
+START_TEST (test_search_get_last_error_initial)
+{
+    const char *json = "{\"object_url\": \"/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_nonnull (search);
+    smm_error err = smm_search_get_last_error (search);
+    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    smm_search_destroy (search);
+}
+END_TEST
+
+START_TEST (test_report_position_sets_asset_error_not_conn)
+{
+    /* With a NULL conn the network call fails; the error must land on the
+     * asset, not the connection, so two assets sharing a connection cannot
+     * clobber each other's error state. */
+    smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+    smm_asset_report_position (asset, -43.5, 172.6, 100, 270, 3);
+    smm_error err = smm_asset_get_last_error (asset);
+    ck_assert_int_ne (err.code, SMM_ERROR_NONE);
+    smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_search_action_sets_search_error_not_conn)
+{
+    /* With conn==NULL the network call fails; the error must land on the
+     * search object. */
+    struct smm_search_s search_s;
+    memset (&search_s, 0, sizeof (search_s));
+    search_s.conn = NULL;
+    search_s.asset_id = 1;
+    search_s.url = strdup ("/search/1/");
+    smm_search_accept (&search_s);
+    smm_error err = smm_search_get_last_error (&search_s);
+    ck_assert_int_ne (err.code, SMM_ERROR_NONE);
+    free (search_s.url);
+}
+END_TEST
+
 START_TEST (test_url_path_safe_valid)
 {
     ck_assert_int_eq (smm_url_path_is_safe ("/search/1/"), true);
@@ -900,6 +965,12 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_connection_login_fields_initialised);
     tcase_add_test (tc_conn, test_get_last_error_null_connection);
     tcase_add_test (tc_conn, test_get_last_error_initial);
+    tcase_add_test (tc_conn, test_asset_get_last_error_null);
+    tcase_add_test (tc_conn, test_asset_get_last_error_initial);
+    tcase_add_test (tc_conn, test_search_get_last_error_null);
+    tcase_add_test (tc_conn, test_search_get_last_error_initial);
+    tcase_add_test (tc_conn, test_report_position_sets_asset_error_not_conn);
+    tcase_add_test (tc_conn, test_search_action_sets_search_error_not_conn);
     tcase_add_test (tc_conn, test_get_state_null_connection);
     tcase_add_test (tc_conn, test_get_state_initial);
     tcase_add_test (tc_conn, test_debugging_set);
