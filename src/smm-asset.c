@@ -546,6 +546,22 @@ smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t 
     pthread_mutex_unlock (&asset->lock);
 }
 
+bool
+smm_url_path_is_safe (const char *url)
+{
+    if (url == NULL || url[0] != '/')
+        return false;
+    if (strstr (url, "..") != NULL)
+        return false;
+    if (strchr (url, '?') != NULL)
+        return false;
+    if (strchr (url, '#') != NULL)
+        return false;
+    if (strchr (url, '%') != NULL)
+        return false;
+    return true;
+}
+
 char *
 smm_asset_build_position_url (long long asset_id, double lat, double lon, unsigned int alt, uint16_t heading,
                               uint8_t fix)
@@ -922,13 +938,13 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
         {
             url = json_string_value (tmp);
         }
-        /* The server contract emits object_url as a relative path
-         * (e.g. "/search/42/"). Reject absolute URLs defensively in
-         * case the contract ever changes — accepting them blindly
-         * here would let the server steer us at an arbitrary host. */
-        if (url && (strncmp (url, "http://", 7) == 0 || strncmp (url, "https://", 8) == 0))
+        /* Validate the server-supplied path: must be a safe relative path
+         * with no '..' segments, query strings, fragments, or percent-
+         * encoded characters that could redirect requests at an arbitrary
+         * endpoint. */
+        if (url && !smm_url_path_is_safe (url))
         {
-            DEBUG ("object_url is absolute; ignoring\n");
+            DEBUG ("object_url is not a safe relative path; ignoring\n");
             url = NULL;
         }
         tmp = json_object_get (json_root, "distance");
