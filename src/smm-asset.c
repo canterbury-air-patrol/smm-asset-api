@@ -1030,6 +1030,28 @@ smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count)
     free (waypoints);
 }
 
+/* Read a non-negative quantity the server may encode as a JSON integer or a
+ * JSON real. json_integer_value() returns 0 for a real value, so accept both;
+ * negative, non-numeric, and out-of-range values clamp into [0, UINT64_MAX]. */
+static uint64_t
+smm_json_number_to_u64 (const json_t *value)
+{
+    if (!json_is_number (value))
+    {
+        return 0;
+    }
+    double d = json_number_value (value);
+    if (d <= 0.0)
+    {
+        return 0;
+    }
+    if (d >= (double)UINT64_MAX)
+    {
+        return UINT64_MAX;
+    }
+    return (uint64_t)d;
+}
+
 smm_search
 smm_parse_search_json (smm_asset asset, const char *data, size_t len)
 {
@@ -1058,21 +1080,9 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
             DEBUG ("object_url is not a safe relative path; ignoring\n");
             url = NULL;
         }
-        tmp = json_object_get (json_root, "distance");
-        if (tmp)
-        {
-            distance = json_integer_value (tmp);
-        }
-        tmp = json_object_get (json_root, "length");
-        if (tmp)
-        {
-            length = json_integer_value (tmp);
-        }
-        tmp = json_object_get (json_root, "sweep_width");
-        if (tmp)
-        {
-            sweep_width = json_integer_value (tmp);
-        }
+        distance = smm_json_number_to_u64 (json_object_get (json_root, "distance"));
+        length = smm_json_number_to_u64 (json_object_get (json_root, "length"));
+        sweep_width = smm_json_number_to_u64 (json_object_get (json_root, "sweep_width"));
         if (url)
         {
             search = smm_search_create (asset, url, length, distance, sweep_width);
