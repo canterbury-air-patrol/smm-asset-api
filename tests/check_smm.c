@@ -508,22 +508,13 @@ START_TEST (test_url_path_safe_dotdot)
 }
 END_TEST
 
-START_TEST (test_url_path_safe_query)
-{
-    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/?injected=evil"), false);
-}
+START_TEST (test_url_path_safe_query) { ck_assert_int_eq (smm_url_path_is_safe ("/search/1/?injected=evil"), false); }
 END_TEST
 
-START_TEST (test_url_path_safe_fragment)
-{
-    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/#frag"), false);
-}
+START_TEST (test_url_path_safe_fragment) { ck_assert_int_eq (smm_url_path_is_safe ("/search/1/#frag"), false); }
 END_TEST
 
-START_TEST (test_url_path_safe_encoded)
-{
-    ck_assert_int_eq (smm_url_path_is_safe ("/search/%2e%2e/admin/"), false);
-}
+START_TEST (test_url_path_safe_encoded) { ck_assert_int_eq (smm_url_path_is_safe ("/search/%2e%2e/admin/"), false); }
 END_TEST
 
 START_TEST (test_url_path_safe_absolute)
@@ -533,10 +524,7 @@ START_TEST (test_url_path_safe_absolute)
 }
 END_TEST
 
-START_TEST (test_url_path_safe_null)
-{
-    ck_assert_int_eq (smm_url_path_is_safe (NULL), false);
-}
+START_TEST (test_url_path_safe_null) { ck_assert_int_eq (smm_url_path_is_safe (NULL), false); }
 END_TEST
 
 START_TEST (test_get_search_dotdot_url_rejected)

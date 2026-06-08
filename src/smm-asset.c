@@ -545,7 +545,7 @@ smm_parse_command (const char *data, size_t len, smm_asset_command *command, dou
 }
 
 static bool
-smm_asset_update_command (smm_asset asset, struct buffer_s *buf)
+smm_asset_update_command (smm_asset asset, const struct buffer_s *buf)
 {
     bool res;
     pthread_mutex_lock (&asset->lock);

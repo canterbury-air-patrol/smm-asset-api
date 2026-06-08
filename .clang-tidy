@@ -1,0 +1,33 @@
+---
+# Check families enabled for this C library.
+#
+# Disabled checks and why:
+#  - portability-avoid-pragma-once: the public and internal headers use
+#    '#pragma once' deliberately; it is supported by every compiler we target.
+#  - clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling:
+#    flags every memcpy/snprintf in favour of the C11 Annex K *_s functions,
+#    which are not available in glibc; not actionable here.
+#  - bugprone-easily-swappable-parameters: the geo API legitimately takes
+#    adjacent (latitude, longitude) and (size, nmemb) pairs; renaming or
+#    retyping them would not improve safety.
+#  - misc-include-cleaner: would demand directly including every libcurl
+#    sub-header for each symbol; <curl/curl.h> is the documented entry point.
+#  - bugprone-multi-level-implicit-pointer-conversion: fires on the standard
+#    C realloc()/free() idiom for arrays of typed pointers (void* <-> T**);
+#    adding explicit casts everywhere would add noise without improving safety.
+Checks: >-
+  -*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  clang-analyzer-*,
+  -portability-avoid-pragma-once,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -misc-include-cleaner
+
+# Headers under src/ are part of the project; include findings from them.
+HeaderFilterRegex: "src/.*"
+WarningsAsErrors: "*"
+...

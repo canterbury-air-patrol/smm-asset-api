@@ -29,3 +29,29 @@ jobs:
       run: docker compose -f tests/docker-compose.yml run tester
     - name: make distcheck
       run: make distcheck
+
+  static-analysis:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install Deps
+      run: |
+        sudo apt update
+        sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev check \
+          cppcheck clang-tidy bear
+
+    # clang-format output is version-dependent; pin the exact version the tree
+    # is formatted with so the formatting gate is reproducible.
+    - name: Install pinned clang-format
+      run: |
+        python3 -m venv /tmp/clang-format-venv
+        /tmp/clang-format-venv/bin/pip install -q clang-format==22.1.5
+
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: ./configure
+    - name: build with compile database
+      run: bear -- make
+    - name: code checks (clang-format, cppcheck, clang-tidy)
+      run: CLANG_FORMAT=/tmp/clang-format-venv/bin/clang-format ./check-code.sh

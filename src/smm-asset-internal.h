@@ -79,18 +79,18 @@ struct smm_asset_s
     double last_command_lat;
     double last_command_lon;
     pthread_mutex_t lock;
-    smm_error last_error;  /* guarded by lock */
+    smm_error last_error; /* guarded by lock */
 };
 
 struct smm_search_s
 {
-    smm_connection conn;   /* owns a reference; acquired in smm_search_create */
-    long long asset_id;    /* cached from the creating asset */
+    smm_connection conn; /* owns a reference; acquired in smm_search_create */
+    long long asset_id;  /* cached from the creating asset */
     char *url;
     uint64_t distance;
     uint64_t length;
     uint64_t sweep_width;
-    smm_error last_error;  /* not guarded; searches are single-threaded */
+    smm_error last_error; /* not guarded; searches are single-threaded */
 };
 
 struct smm_curl_res_s

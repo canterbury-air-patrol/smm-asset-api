@@ -20,3 +20,13 @@ missing
 src/smm-asset.pc
 *.tar.gz
 *~
+
+# check-code.sh / static analysis artifacts
+compile_commands.json
+clang-tidy.log
+stamp-h1
+test-driver
+tests/check_smm
+tests/*.o
+tests/*.log
+tests/*.trs
