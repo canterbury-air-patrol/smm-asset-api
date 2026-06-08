@@ -439,6 +439,7 @@ smm_parse_csrf_token (const char *data, size_t len)
 {
     char *token = NULL;
     TidyBuffer docbuf = { 0 };
+    TidyBuffer errbuf = { 0 };
     TidyDoc tdoc = tidyCreate ();
 
     if (tdoc == NULL)
@@ -449,7 +450,14 @@ smm_parse_csrf_token (const char *data, size_t len)
     tidyOptSetBool (tdoc, TidyForceOutput, yes);
     tidyOptSetInt (tdoc, TidyWrapLen, 4096);
     tidyBufInit (&docbuf);
+    tidyBufInit (&errbuf);
     tidyBufAppend (&docbuf, (void *)data, len);
+
+    /* Redirect tidy's diagnostics into a buffer we discard; otherwise it
+     * writes parser warnings about the login page straight to the host
+     * application's stderr on every login. Best-effort: if the redirect
+     * cannot be installed we still parse rather than failing the login. */
+    tidySetErrorBuffer (tdoc, &errbuf);
 
     if (tidyParseBuffer (tdoc, &docbuf) >= 0)
     {
@@ -458,6 +466,7 @@ smm_parse_csrf_token (const char *data, size_t len)
     }
 
     tidyBufFree (&docbuf);
+    tidyBufFree (&errbuf);
     tidyRelease (tdoc);
 
     return token;
