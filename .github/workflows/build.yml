@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Install Deps
-      run: sudo apt update && sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev check
+      run: sudo apt update && sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev check locales-all
     - name: autogen
       run: ./autogen.sh
     - name: configure

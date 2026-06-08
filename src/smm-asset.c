@@ -23,6 +23,7 @@
 #include "smm-asset.h"
 #include "smm-asset-internal.h"
 
+#include <locale.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -31,6 +32,52 @@
 #include <jansson.h>
 
 _Atomic bool smm_debug = false;
+
+/*
+ * SMM expects coordinates in URLs formatted with '.' as the decimal separator.
+ * printf-family conversions honour the thread's LC_NUMERIC, so a caller running
+ * under a locale such as de_DE would otherwise emit "lat=-43,5" and corrupt the
+ * request. We keep a private "C" locale and switch to it (per-thread, via
+ * uselocale) only while formatting numbers.
+ */
+static locale_t smm_c_locale = (locale_t)0;
+static pthread_once_t smm_c_locale_once = PTHREAD_ONCE_INIT;
+
+static void
+smm_c_locale_init (void)
+{
+    smm_c_locale = newlocale (LC_NUMERIC_MASK, "C", (locale_t)0);
+}
+
+static locale_t
+smm_c_locale_get (void)
+{
+    pthread_once (&smm_c_locale_once, smm_c_locale_init);
+    return smm_c_locale;
+}
+
+/* asprintf() that formats in the private "C" locale (see above), so coordinate
+ * conversions use '.' as the decimal separator regardless of the caller's
+ * LC_NUMERIC. Returns the asprintf() result; *strp is undefined on failure. */
+static int smm_asprintf_c_locale (char **strp, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
+
+static int
+smm_asprintf_c_locale (char **strp, const char *fmt, ...)
+{
+    locale_t c_locale = smm_c_locale_get ();
+    locale_t old_locale = (c_locale != (locale_t)0) ? uselocale (c_locale) : (locale_t)0;
+
+    va_list ap;
+    va_start (ap, fmt);
+    int n = vasprintf (strp, fmt, ap);
+    va_end (ap);
+
+    if (old_locale != (locale_t)0)
+    {
+        uselocale (old_locale);
+    }
+    return n;
+}
 
 void
 smm_asset_debugging_set (bool debug)
@@ -634,8 +681,8 @@ smm_asset_build_position_url (long long asset_id, double lat, double lon, unsign
                               uint8_t fix)
 {
     char *page = NULL;
-    if (asprintf (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&heading=%u&fix=%u", asset_id, lat, lon,
-                  alt, heading, fix)
+    if (smm_asprintf_c_locale (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&heading=%u&fix=%u",
+                               asset_id, lat, lon, alt, heading, fix)
         < 0)
     {
         return NULL;
@@ -1050,8 +1097,8 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     struct buffer_s buf = { NULL, 0 };
 
     char *page = NULL;
-    if (asprintf (&page, "/search/find/closest/?asset_id=%lli&latitude=%lf&longitude=%lf", asset->asset_id, latitude,
-                  longitude)
+    if (smm_asprintf_c_locale (&page, "/search/find/closest/?asset_id=%lli&latitude=%lf&longitude=%lf", asset->asset_id,
+                               latitude, longitude)
         < 0)
     {
         return NULL;

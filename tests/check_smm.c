@@ -1,6 +1,7 @@
 #include "smm-asset-internal.h"
 #include "smm-asset.h"
 #include <check.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -425,6 +426,42 @@ START_TEST (test_build_position_url_heading)
     ck_assert_ptr_nonnull (strstr (url, "heading="));
     ck_assert_ptr_null (strstr (url, "bearing="));
     free (url);
+}
+END_TEST
+
+/* Coordinates must always use '.' as the decimal separator regardless of the
+ * caller's LC_NUMERIC. We assert this under the current locale (always) and,
+ * when a comma-decimal locale is installed, under that locale too. */
+START_TEST (test_build_position_url_locale_independent)
+{
+    char *url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
+    ck_assert_ptr_nonnull (url);
+    ck_assert_ptr_nonnull (strstr (url, "lat=-43.500000"));
+    ck_assert_ptr_nonnull (strstr (url, "lon=172.600000"));
+    free (url);
+
+    /* Try a few locales that format decimals with a comma. If none are
+     * installed (e.g. a minimal CI image) the loop is a no-op and the
+     * assertions above still guard the common case. */
+    const char *comma_locales[] = { "de_DE.UTF-8", "de_DE.utf8", "de_DE", "fr_FR.UTF-8", "nl_NL.UTF-8" };
+    for (size_t i = 0; i < sizeof (comma_locales) / sizeof (comma_locales[0]); i++)
+    {
+        locale_t loc = newlocale (LC_NUMERIC_MASK, comma_locales[i], (locale_t)0);
+        if (loc == (locale_t)0)
+        {
+            continue;
+        }
+        locale_t old = uselocale (loc);
+        url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
+        uselocale (old);
+        freelocale (loc);
+
+        ck_assert_ptr_nonnull (url);
+        ck_assert_ptr_nonnull (strstr (url, "lat=-43.500000"));
+        ck_assert_ptr_null (strstr (url, ","));
+        free (url);
+        break;
+    }
 }
 END_TEST
 
@@ -966,6 +1003,7 @@ smm_suite (void)
 
     TCase *tc_position = tcase_create ("Position");
     tcase_add_test (tc_position, test_build_position_url_heading);
+    tcase_add_test (tc_position, test_build_position_url_locale_independent);
     tcase_add_test (tc_position, test_set_command_from_plaintext_continue);
     tcase_add_test (tc_position, test_set_command_from_plaintext_other);
     tcase_add_test (tc_position, test_set_command_from_plaintext_null);
