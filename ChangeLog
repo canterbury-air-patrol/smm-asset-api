@@ -1,0 +1,9 @@
+The detailed, per-commit change history is maintained in git.
+
+Browse it at:
+  https://github.com/canterbury-air-patrol/smm-asset-api/commits
+
+or locally with:
+  git log
+
+See NEWS for a summary of user-visible changes in each release.

@@ -1,3 +1,10 @@
+libsmm-asset (1.0.0) unstable; urgency=medium
+
+  * First stable release.
+  * Versioned ABI (SONAME libsmmasset.so.0) exporting only the public API.
+
+ -- Scott Parlane <sjp@canterburyairpatrol.org>  Mon, 08 Jun 2026 00:00:00 +0000
+
 libsmm-asset (0.4.1) unstable; urgency=medium
 
   * Updated

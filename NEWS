@@ -1,0 +1,16 @@
+libsmm-asset 1.0.0
+==================
+
+First stable release.
+
+ * Structured error reporting: smm_connection_get_last_error(),
+   smm_asset_get_last_error(), smm_search_get_last_error() and the smm_error
+   type with machine-readable smm_error_code values.
+ * Thread-safe connection sharing backed by reference counting, so assets and
+   searches may outlive smm_connection_close().
+ * Hardened HTTP handling: TLS verification enabled by default, connect and
+   transfer timeouts on every request, validated redirects, same-host-only
+   HTTP->HTTPS upgrades, and rejection of unsafe server-supplied paths.
+ * Coordinates are formatted locale-independently in request URLs.
+ * Stable, versioned ABI (SONAME libsmmasset.so.0) that exports only the
+   documented public API.

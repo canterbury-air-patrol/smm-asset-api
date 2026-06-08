@@ -27,6 +27,14 @@
 #include <stdint.h>
 
 /**
+ * Library version. Keep in sync with the package version in configure.ac.
+ */
+#define SMM_VERSION_MAJOR 1
+#define SMM_VERSION_MINOR 0
+#define SMM_VERSION_PATCH 0
+#define SMM_VERSION_STRING "1.0.0"
+
+/**
  * Error codes returned by smm_connection_get_last_error()
  */
 typedef enum
