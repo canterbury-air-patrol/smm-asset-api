@@ -31,13 +31,13 @@
  */
 typedef enum
 {
-    SMM_ERROR_NONE = 0,         /*!< No error */
-    SMM_ERROR_NETWORK,          /*!< Network or connection failure */
-    SMM_ERROR_AUTH,             /*!< Authentication failure */
-    SMM_ERROR_PROTOCOL,         /*!< Unexpected or malformed response */
-    SMM_ERROR_PARSE,            /*!< JSON or HTML parse failure */
-    SMM_ERROR_INVALID_ARG,      /*!< Invalid argument (e.g. NULL pointer) */
-    SMM_ERROR_SERVER,           /*!< Server returned an unexpected HTTP status */
+    SMM_ERROR_NONE = 0,    /*!< No error */
+    SMM_ERROR_NETWORK,     /*!< Network or connection failure */
+    SMM_ERROR_AUTH,        /*!< Authentication failure */
+    SMM_ERROR_PROTOCOL,    /*!< Unexpected or malformed response */
+    SMM_ERROR_PARSE,       /*!< JSON or HTML parse failure */
+    SMM_ERROR_INVALID_ARG, /*!< Invalid argument (e.g. NULL pointer) */
+    SMM_ERROR_SERVER,      /*!< Server returned an unexpected HTTP status */
 } smm_error_code;
 
 /**
@@ -45,8 +45,8 @@ typedef enum
  */
 typedef struct
 {
-    smm_error_code code;  /*!< Machine-readable error code */
-    char message[256];    /*!< Human-readable description */
+    smm_error_code code; /*!< Machine-readable error code */
+    char message[256];   /*!< Human-readable description */
 } smm_error;
 
 /**

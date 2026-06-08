@@ -146,13 +146,17 @@ smm_curl_res_free (struct smm_curl_res_s *res)
     }
 }
 
+/* Signature is fixed by libcurl's curl_write_callback; params cannot be const. */
 static size_t
+/* cppcheck-suppress[constParameterCallback] */
 eat_data (char *ptr __attribute__ ((unused)), size_t size, size_t nmemb, void *userdata __attribute__ ((unused)))
 {
     return size * nmemb;
 }
 
+/* Signature is fixed by libcurl's curl_write_callback; ptr cannot be const. */
 size_t
+/* cppcheck-suppress[constParameterPointer] */
 to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 {
     size_t new_bytes = size * nmemb;
@@ -312,6 +316,8 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
             }
         }
         break;
+        default:
+            break;
     }
 
 out:
@@ -553,8 +559,7 @@ smm_asset_connection_login (smm_connection connection)
             break;
         case SMM_CONNECTION_AUTHENTICATION_FAILURE:
             connection->last_error.code = SMM_ERROR_AUTH;
-            snprintf (connection->last_error.message, sizeof (connection->last_error.message),
-                      "authentication failed");
+            snprintf (connection->last_error.message, sizeof (connection->last_error.message), "authentication failed");
             break;
         case SMM_CONNECTION_PROTOCOL_ERROR:
             connection->last_error.code = SMM_ERROR_PROTOCOL;
@@ -568,8 +573,7 @@ smm_asset_connection_login (smm_connection connection)
             break;
         default:
             connection->last_error.code = SMM_ERROR_SERVER;
-            snprintf (connection->last_error.message, sizeof (connection->last_error.message),
-                      "login failed");
+            snprintf (connection->last_error.message, sizeof (connection->last_error.message), "login failed");
             break;
     }
     connection->login_in_progress = false;
