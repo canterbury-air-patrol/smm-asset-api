@@ -593,6 +593,14 @@ smm_asset_connection_login (smm_connection connection)
 }
 
 bool
+smm_httpcode_is_redirect (long httpcode)
+{
+    /* The redirects we follow: 301 (e.g. Django's SECURE_SSL_REDIRECT
+     * HTTP->HTTPS upgrade), 302 (login redirect), and 303. */
+    return httpcode == HTTP_MOVED_PERMANENTLY || httpcode == HTTP_FOUND || httpcode == HTTP_SEE_OTHER;
+}
+
+bool
 smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect)
 {
     if (http_host == NULL || https_redirect == NULL)
@@ -626,7 +634,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
     {
         retry = false;
         retries++;
-        if (res->success && res->httpcode == HTTP_FOUND && res->redirect_url)
+        if (res->success && smm_httpcode_is_redirect (res->httpcode) && res->redirect_url)
         {
             DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
             /* It's possible we need to upgrade to https */
