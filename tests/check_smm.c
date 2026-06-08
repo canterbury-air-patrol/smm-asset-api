@@ -273,6 +273,31 @@ START_TEST (test_get_search_relative_url_accepted)
 }
 END_TEST
 
+START_TEST (test_get_search_real_numeric_fields)
+{
+    /* The server contract does not guarantee integers; a real-valued
+     * distance/length/sweep_width must still be read (json_integer_value
+     * would have returned 0). */
+    const char *json = "{\"object_url\": \"/search/1/\", \"distance\": 10.7, \"length\": 100.9, \"sweep_width\": 50.5}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_nonnull (search);
+    ck_assert_uint_eq (smm_search_distance (search), 10);
+    ck_assert_uint_eq (smm_search_length (search), 100);
+    ck_assert_uint_eq (smm_search_sweep_width (search), 50);
+    smm_search_destroy (search);
+}
+END_TEST
+
+START_TEST (test_get_search_negative_numeric_clamps_zero)
+{
+    const char *json = "{\"object_url\": \"/search/1/\", \"distance\": -5, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_nonnull (search);
+    ck_assert_uint_eq (smm_search_distance (search), 0);
+    smm_search_destroy (search);
+}
+END_TEST
+
 START_TEST (test_search_accept_null_conn)
 {
     struct smm_search_s search_s;
@@ -1089,6 +1114,8 @@ smm_suite (void)
     tcase_add_test (tc_search, test_get_search_nonstring_object_url_returns_null);
     tcase_add_test (tc_search, test_get_search_missing_object_url_returns_null);
     tcase_add_test (tc_search, test_get_search_relative_url_accepted);
+    tcase_add_test (tc_search, test_get_search_real_numeric_fields);
+    tcase_add_test (tc_search, test_get_search_negative_numeric_clamps_zero);
     tcase_add_test (tc_search, test_get_search_dotdot_url_rejected);
     tcase_add_test (tc_search, test_get_search_query_url_rejected);
     tcase_add_test (tc_search, test_get_search_encoded_url_rejected);
