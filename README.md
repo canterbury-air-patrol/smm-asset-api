@@ -54,9 +54,15 @@ int main(int argc, char *argv[])
 
 		/* You can also get a search to conduct by */
 		smm_search search;
-		do {
-			search = smm_asset_get_search (asset, -43, 172);
-		} while (search != NULL && !smm_search_accept (search));
+		while ((search = smm_asset_get_search (asset, -43, 172)) != NULL)
+		{
+			if (smm_search_accept (search))
+			{
+				break;
+			}
+			/* The server declined this search; discard it and ask again */
+			smm_search_destroy (search);
+		}
 
 		if (search != NULL)
 		{
