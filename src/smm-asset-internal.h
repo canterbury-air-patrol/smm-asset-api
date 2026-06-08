@@ -148,6 +148,10 @@ void smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, si
 
 smm_search smm_parse_search_json (smm_asset asset, const char *data, size_t len);
 
+/* Returns true for the HTTP status codes we treat as followable redirects
+ * (301, 302, 303). */
+bool smm_httpcode_is_redirect (long httpcode);
+
 /* Returns true if https_redirect is an HTTPS upgrade of http_host to the
  * same host:port — used to guard against redirect-based downgrade attacks. */
 bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect);

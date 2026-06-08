@@ -600,6 +600,24 @@ START_TEST (test_curl_timeout_constants)
 }
 END_TEST
 
+START_TEST (test_httpcode_is_redirect)
+{
+    ck_assert_int_eq (smm_httpcode_is_redirect (301), true);
+    ck_assert_int_eq (smm_httpcode_is_redirect (302), true);
+    ck_assert_int_eq (smm_httpcode_is_redirect (303), true);
+}
+END_TEST
+
+START_TEST (test_httpcode_is_not_redirect)
+{
+    ck_assert_int_eq (smm_httpcode_is_redirect (200), false);
+    ck_assert_int_eq (smm_httpcode_is_redirect (304), false);
+    ck_assert_int_eq (smm_httpcode_is_redirect (307), false);
+    ck_assert_int_eq (smm_httpcode_is_redirect (400), false);
+    ck_assert_int_eq (smm_httpcode_is_redirect (0), false);
+}
+END_TEST
+
 START_TEST (test_https_upgrade_same_host)
 {
     ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", "https://example.com/login/"), true);
@@ -973,6 +991,8 @@ smm_suite (void)
 
     tc_conn = tcase_create ("Connection");
     tcase_add_test (tc_conn, test_curl_timeout_constants);
+    tcase_add_test (tc_conn, test_httpcode_is_redirect);
+    tcase_add_test (tc_conn, test_httpcode_is_not_redirect);
     tcase_add_test (tc_conn, test_curl_retrieve_url_r_returns_null_on_no_response);
     tcase_add_test (tc_conn, test_login_in_progress_reset_on_failure);
     tcase_add_test (tc_conn, test_https_upgrade_same_host);
