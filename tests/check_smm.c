@@ -164,6 +164,23 @@ START_TEST (test_assets_parsing_noninteger_id)
 }
 END_TEST
 
+START_TEST (test_assets_parsing_noninteger_type_id)
+{
+    /* type_id is optional; a non-integer value is tolerated (left at the
+     * sentinel) and does not drop an otherwise valid asset. */
+    const char *json = "{\"assets\": [{\"id\": 1, \"type_id\": \"oops\", \"name\": \"Asset 1\", \"type_name\": "
+                       "\"Type 1\"}]}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets (NULL, json, strlen (json), &assets, &count);
+
+    ck_assert_uint_eq (res, true);
+    ck_assert_uint_eq (count, 1);
+    ck_assert_str_eq (smm_asset_name (assets[0]), "Asset 1");
+    smm_asset_free_assets (assets, count);
+}
+END_TEST
+
 START_TEST (test_assets_parsing_drops_only_invalid)
 {
     /* A valid asset is kept even when another entry in the array lacks an id. */
@@ -1212,6 +1229,7 @@ smm_suite (void)
     tcase_add_test (tc_assets, test_assets_parsing_invalid);
     tcase_add_test (tc_assets, test_assets_parsing_missing_id);
     tcase_add_test (tc_assets, test_assets_parsing_noninteger_id);
+    tcase_add_test (tc_assets, test_assets_parsing_noninteger_type_id);
     tcase_add_test (tc_assets, test_assets_parsing_drops_only_invalid);
     tcase_add_test (tc_assets, test_assets_parsing_missing_type_id);
     suite_add_tcase (s, tc_assets);
