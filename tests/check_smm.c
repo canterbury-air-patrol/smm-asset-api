@@ -1034,7 +1034,16 @@ START_TEST (test_get_state_initial)
 {
     smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
     ck_assert_ptr_nonnull (conn);
-    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_UNKNOWN);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_NEW);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_get_state_invalid_host)
+{
+    smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
     smm_connection_close (conn);
 }
 END_TEST
@@ -1077,6 +1086,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_search_action_sets_search_error_not_conn);
     tcase_add_test (tc_conn, test_get_state_null_connection);
     tcase_add_test (tc_conn, test_get_state_initial);
+    tcase_add_test (tc_conn, test_get_state_invalid_host);
     tcase_add_test (tc_conn, test_debugging_set);
     suite_add_tcase (s, tc_conn);
 

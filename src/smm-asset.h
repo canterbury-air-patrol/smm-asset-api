@@ -123,13 +123,14 @@ typedef struct smm_waypoint_s **smm_waypoints;
  */
 typedef enum
 {
-    SMM_CONNECTION_UNKNOWN,                /*!< Unknown state or invalid object */
+    SMM_CONNECTION_UNKNOWN,                /*!< Invalid object (e.g. NULL connection) */
     SMM_CONNECTION_CONNECTED,              /*!< Currently connected */
     SMM_CONNECTION_HOST_INVALID,           /*!< Host URL invalid, i.e. not http(s):// or not a valid domain */
     SMM_CONNECTION_NO_HOST_CONNECTION,     /*!< Unable to connect to host */
     SMM_CONNECTION_AUTHENTICATION_FAILURE, /*!< Unable to authenticate with host */
     SMM_CONNECTION_PROTOCOL_ERROR,         /*!< Unexpected response from host */
     SMM_CONNECTION_FAILURE,                /*!< Unable to communicate, for another reason */
+    SMM_CONNECTION_NEW,                    /*!< Valid host accepted, but no request made yet (login is lazy) */
 } smm_connection_status;
 
 /**
@@ -168,6 +169,10 @@ smm_connection smm_asset_connect (const char *host, const char *user, const char
 
 /**
  * Check the state of a connection
+ *
+ * Authentication is performed lazily on the first request, so a freshly
+ * connected object with a valid host reports SMM_CONNECTION_NEW until a
+ * request transitions it to SMM_CONNECTION_CONNECTED (or an error state).
  *
  * @param connection the smm_connection object to check
  *

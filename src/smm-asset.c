@@ -133,6 +133,11 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
         {
             conn->state = SMM_CONNECTION_HOST_INVALID;
         }
+        else
+        {
+            /* Host looks valid; login happens lazily on the first request. */
+            conn->state = SMM_CONNECTION_NEW;
+        }
         curl_url_cleanup (curlu);
     }
     else
