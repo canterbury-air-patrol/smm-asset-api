@@ -696,6 +696,11 @@ smm_ascii_caseeq (const char *a, const char *b, size_t n)
     {
         unsigned char ca = (unsigned char)a[i];
         unsigned char cb = (unsigned char)b[i];
+        /* Stop at a terminator on either side. A shorter string mismatches
+         * (and the comparison stays in-bounds) without relying on the
+         * argument that b never contains an embedded NUL. */
+        if (ca == '\0' || cb == '\0')
+            return false;
         if (ca >= 'A' && ca <= 'Z')
             ca = (unsigned char)(ca + ('a' - 'A'));
         if (cb >= 'A' && cb <= 'Z')
