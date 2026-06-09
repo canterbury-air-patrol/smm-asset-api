@@ -660,6 +660,51 @@ smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t 
     pthread_mutex_unlock (&asset->lock);
 }
 
+/* ASCII-only, case-insensitive comparison of the first n bytes. Used for
+ * media-type matching so the result does not depend on the caller's locale
+ * (e.g. the Turkish dotless-i rule that would break strncasecmp). */
+static bool
+smm_ascii_caseeq (const char *a, const char *b, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+    {
+        unsigned char ca = (unsigned char)a[i];
+        unsigned char cb = (unsigned char)b[i];
+        if (ca >= 'A' && ca <= 'Z')
+            ca = (unsigned char)(ca + ('a' - 'A'));
+        if (cb >= 'A' && cb <= 'Z')
+            cb = (unsigned char)(cb + ('a' - 'A'));
+        if (ca != cb)
+            return false;
+    }
+    return true;
+}
+
+bool
+smm_content_type_is_json (const char *content_type)
+{
+    static const char json[] = "application/json";
+    const size_t json_len = sizeof (json) - 1;
+
+    if (content_type == NULL)
+        return false;
+
+    /* Skip any leading whitespace before the media type. */
+    while (*content_type == ' ' || *content_type == '\t')
+        content_type++;
+
+    if (!smm_ascii_caseeq (content_type, json, json_len))
+        return false;
+
+    /* The media type must end here: only whitespace or a ';' parameter
+     * delimiter may follow (e.g. "application/json; charset=utf-8"). This
+     * rejects look-alikes such as "application/json-patch+json". */
+    const char *after = content_type + json_len;
+    while (*after == ' ' || *after == '\t')
+        after++;
+    return *after == '\0' || *after == ';';
+}
+
 bool
 smm_url_path_is_safe (const char *url)
 {
@@ -726,7 +771,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, u
     free (page);
 
     /* if json data was returned, update the current action */
-    if (res->content_type != NULL && strcmp (res->content_type, "application/json") == 0)
+    if (smm_content_type_is_json (res->content_type))
     {
         smm_asset_update_command (asset, &buf);
     }
@@ -1132,7 +1177,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     }
     free (page);
 
-    if (res->content_type != NULL && strcmp (res->content_type, "application/json") == 0)
+    if (smm_content_type_is_json (res->content_type))
     {
         search = smm_parse_search_json (asset, buf.data, buf.bytes);
     }

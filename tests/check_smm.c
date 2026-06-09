@@ -589,6 +589,40 @@ END_TEST
 START_TEST (test_url_path_safe_null) { ck_assert_int_eq (smm_url_path_is_safe (NULL), false); }
 END_TEST
 
+START_TEST (test_content_type_is_json_plain) { ck_assert_int_eq (smm_content_type_is_json ("application/json"), true); }
+END_TEST
+
+START_TEST (test_content_type_is_json_with_charset)
+{
+    ck_assert_int_eq (smm_content_type_is_json ("application/json; charset=utf-8"), true);
+    ck_assert_int_eq (smm_content_type_is_json ("application/json;charset=utf-8"), true);
+    ck_assert_int_eq (smm_content_type_is_json ("application/json \t; charset=utf-8"), true);
+}
+END_TEST
+
+START_TEST (test_content_type_is_json_case_insensitive)
+{
+    ck_assert_int_eq (smm_content_type_is_json ("Application/JSON"), true);
+    ck_assert_int_eq (smm_content_type_is_json ("APPLICATION/JSON; CHARSET=UTF-8"), true);
+}
+END_TEST
+
+START_TEST (test_content_type_is_json_leading_whitespace)
+{
+    ck_assert_int_eq (smm_content_type_is_json ("  application/json"), true);
+}
+END_TEST
+
+START_TEST (test_content_type_is_json_rejects_lookalikes)
+{
+    ck_assert_int_eq (smm_content_type_is_json ("application/json-patch+json"), false);
+    ck_assert_int_eq (smm_content_type_is_json ("application/jsonx"), false);
+    ck_assert_int_eq (smm_content_type_is_json ("text/html"), false);
+    ck_assert_int_eq (smm_content_type_is_json (""), false);
+    ck_assert_int_eq (smm_content_type_is_json (NULL), false);
+}
+END_TEST
+
 START_TEST (test_get_search_dotdot_url_rejected)
 {
     const char *json = "{\"object_url\": \"/search/1/../../admin/\", \"distance\": 10, \"length\": 100, "
@@ -1130,6 +1164,14 @@ smm_suite (void)
     tcase_add_test (tc_url, test_url_path_safe_absolute);
     tcase_add_test (tc_url, test_url_path_safe_null);
     suite_add_tcase (s, tc_url);
+
+    TCase *tc_content_type = tcase_create ("ContentType");
+    tcase_add_test (tc_content_type, test_content_type_is_json_plain);
+    tcase_add_test (tc_content_type, test_content_type_is_json_with_charset);
+    tcase_add_test (tc_content_type, test_content_type_is_json_case_insensitive);
+    tcase_add_test (tc_content_type, test_content_type_is_json_leading_whitespace);
+    tcase_add_test (tc_content_type, test_content_type_is_json_rejects_lookalikes);
+    suite_add_tcase (s, tc_content_type);
 
     TCase *tc_position_ext = tcase_create ("PositionExt");
     tcase_add_test (tc_position_ext, test_build_position_url_values);

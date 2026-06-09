@@ -160,3 +160,8 @@ bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_re
  * no '..' segments, no query ('?'), no fragment ('#'), and no percent-
  * encoded characters ('%'). */
 bool smm_url_path_is_safe (const char *url);
+
+/* Returns true if content_type is the application/json media type, ignoring
+ * ASCII case, leading whitespace, and any parameters (e.g. "; charset=utf-8").
+ * A NULL content_type returns false. */
+bool smm_content_type_is_json (const char *content_type);
