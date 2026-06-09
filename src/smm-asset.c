@@ -75,6 +75,13 @@ smm_asprintf_c_locale (char **strp, const char *fmt, ...)
         return -1;
     }
 
+    /* POSIX: uselocale() returns the previous locale on success, or
+     * (locale_t)0 on error. The previous locale is never (locale_t)0 — on a
+     * thread that has not set a per-thread locale it is LC_GLOBAL_LOCALE
+     * ((locale_t)-1), which is a *success* value we must restore below. So the
+     * error test is == 0; do NOT change it to == -1 (that would treat the
+     * common fresh-thread case as a failure and leave the thread in the C
+     * locale). */
     locale_t old_locale = uselocale (c_locale);
     if (old_locale == (locale_t)0)
     {
