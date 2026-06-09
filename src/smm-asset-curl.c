@@ -360,10 +360,20 @@ populate_tidy (char *ptr, size_t size, size_t nmemb, void *userdata)
     return size * nmemb;
 }
 
+/* Bound on how deeply extract_csrfmiddlewaretoken recurses into the parsed
+ * login page. A login form is shallow; this only exists so a pathologically
+ * nested (hostile) document cannot exhaust the stack. */
+#define SMM_CSRF_MAX_DEPTH 256
+
 static bool
-extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
+extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token, int depth)
 {
     bool res = false;
+    if (depth >= SMM_CSRF_MAX_DEPTH)
+    {
+        DEBUG ("CSRF search exceeded max depth %i; stopping descent\n", SMM_CSRF_MAX_DEPTH);
+        return false;
+    }
     for (TidyNode child = tidyGetChild (tnod); child; child = tidyGetNext (child))
     {
         ctmbstr name = tidyNodeGetName (child);
@@ -434,7 +444,7 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token)
                 }
             }
         }
-        res = extract_csrfmiddlewaretoken (tdoc, child, token);
+        res = extract_csrfmiddlewaretoken (tdoc, child, token, depth + 1);
         if (res)
         {
             return res;
@@ -471,7 +481,7 @@ smm_parse_csrf_token (const char *data, size_t len)
     if (tidyParseBuffer (tdoc, &docbuf) >= 0)
     {
         tidyCleanAndRepair (tdoc);
-        extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &token);
+        extract_csrfmiddlewaretoken (tdoc, tidyGetRoot (tdoc), &token, 0);
     }
 
     tidyBufFree (&docbuf);
