@@ -48,6 +48,34 @@ START_TEST (test_csrf_extraction_too_long)
 }
 END_TEST
 
+START_TEST (test_csrf_extraction_deeply_nested)
+{
+    /* Bury the token far below the recursion cap inside deeply nested
+     * elements. The walker must stop descending without overflowing the
+     * stack; the token, being out of reach, is simply not returned. */
+    const size_t depth = 600;
+    const char open[] = "<div>";
+    const char close[] = "</div>";
+    const char input[] = "<input type=\"hidden\" name=\"csrfmiddlewaretoken\" value=\"deep\">";
+    size_t cap = depth * (sizeof (open) - 1 + sizeof (close) - 1) + sizeof (input) + 64;
+    char *html = malloc (cap);
+    ck_assert_ptr_nonnull (html);
+
+    size_t pos = 0;
+    for (size_t i = 0; i < depth; i++)
+        pos += (size_t)snprintf (html + pos, cap - pos, "%s", open);
+    pos += (size_t)snprintf (html + pos, cap - pos, "%s", input);
+    for (size_t i = 0; i < depth; i++)
+        pos += (size_t)snprintf (html + pos, cap - pos, "%s", close);
+
+    char *token = smm_parse_csrf_token (html, strlen (html));
+    ck_assert_ptr_null (token);
+
+    free (token);
+    free (html);
+}
+END_TEST
+
 START_TEST (test_assets_parsing)
 {
     const char *json = "{\"assets\": [{\"id\": 1, \"type_id\": 2, \"name\": \"Asset 1\", \"type_name\": \"Type "
@@ -1175,6 +1203,7 @@ smm_suite (void)
     tcase_add_test (tc_csrf, test_csrf_extraction_missing);
     tcase_add_test (tc_csrf, test_csrf_extraction_invalid_chars);
     tcase_add_test (tc_csrf, test_csrf_extraction_too_long);
+    tcase_add_test (tc_csrf, test_csrf_extraction_deeply_nested);
     suite_add_tcase (s, tc_csrf);
 
     TCase *tc_assets = tcase_create ("Assets");
