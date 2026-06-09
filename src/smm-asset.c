@@ -398,7 +398,14 @@ smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_a
                     }
                     else if (strcmp (key, "type_id") == 0)
                     {
-                        asset_type_id = json_integer_value (val);
+                        /* Validate as an integer, consistent with "id", so a
+                         * non-integer value is left as the -1 sentinel rather
+                         * than silently coerced to 0. type_id is optional, so
+                         * an absent or malformed one does not drop the asset. */
+                        if (json_is_integer (val))
+                        {
+                            asset_type_id = json_integer_value (val);
+                        }
                     }
                     else if (strcmp (key, "name") == 0)
                     {
