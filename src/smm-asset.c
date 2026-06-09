@@ -58,24 +58,35 @@ smm_c_locale_get (void)
 
 /* asprintf() that formats in the private "C" locale (see above), so coordinate
  * conversions use '.' as the decimal separator regardless of the caller's
- * LC_NUMERIC. Returns the asprintf() result; *strp is undefined on failure. */
+ * LC_NUMERIC. Returns the asprintf() result; *strp is undefined on failure.
+ *
+ * If the private "C" locale is unavailable or cannot be installed, the
+ * function fails (returns < 0) rather than formatting in the caller's locale:
+ * emitting a corrupted coordinate such as "lat=-43,5" would be worse than
+ * failing the request outright. */
 static int smm_asprintf_c_locale (char **strp, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
 
 static int
 smm_asprintf_c_locale (char **strp, const char *fmt, ...)
 {
     locale_t c_locale = smm_c_locale_get ();
-    locale_t old_locale = (c_locale != (locale_t)0) ? uselocale (c_locale) : (locale_t)0;
+    if (c_locale == (locale_t)0)
+    {
+        return -1;
+    }
+
+    locale_t old_locale = uselocale (c_locale);
+    if (old_locale == (locale_t)0)
+    {
+        return -1;
+    }
 
     va_list ap;
     va_start (ap, fmt);
     int n = vasprintf (strp, fmt, ap);
     va_end (ap);
 
-    if (old_locale != (locale_t)0)
-    {
-        uselocale (old_locale);
-    }
+    uselocale (old_locale);
     return n;
 }
 
