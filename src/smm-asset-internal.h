@@ -41,6 +41,13 @@ enum http_return_codes
 #define SMM_CURL_CONNECT_TIMEOUT_SECS 30L
 #define SMM_CURL_TRANSFER_TIMEOUT_SECS 60L
 
+/* Upper bound on a buffered response body. The endpoints this library talks
+ * to return small JSON/GeoJSON documents and a login HTML page, so this is a
+ * generous ceiling that protects against a hostile or broken server driving
+ * unbounded memory growth (and guards the buffer arithmetic against overflow).
+ */
+#define SMM_MAX_RESPONSE_BYTES ((size_t)8 * 1024 * 1024)
+
 extern _Atomic bool smm_debug;
 #define DEBUG(...)                                                                                                     \
     do                                                                                                                 \
