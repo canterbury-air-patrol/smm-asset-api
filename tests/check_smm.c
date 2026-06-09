@@ -621,6 +621,38 @@ END_TEST
 START_TEST (test_url_path_safe_null) { ck_assert_int_eq (smm_url_path_is_safe (NULL), false); }
 END_TEST
 
+START_TEST (test_to_buffer_accumulates)
+{
+    struct buffer_s buf = { NULL, 0 };
+    char chunk1[] = "abc";
+    char chunk2[] = "de";
+    ck_assert_uint_eq (to_buffer (chunk1, 1, 3, &buf), 3);
+    ck_assert_uint_eq (to_buffer (chunk2, 1, 2, &buf), 2);
+    ck_assert_uint_eq (buf.bytes, 5);
+    ck_assert_str_eq (buf.data, "abcde");
+    free (buf.data);
+}
+END_TEST
+
+START_TEST (test_to_buffer_rejects_oversized_chunk)
+{
+    /* A single chunk larger than the cap is refused without allocating. */
+    struct buffer_s buf = { NULL, 0 };
+    char chunk[] = "x";
+    ck_assert_uint_eq (to_buffer (chunk, 1, SMM_MAX_RESPONSE_BYTES + 1, &buf), 0);
+    ck_assert_ptr_null (buf.data);
+}
+END_TEST
+
+START_TEST (test_to_buffer_rejects_when_full)
+{
+    /* Once bytes have reached the cap, further writes are refused. */
+    struct buffer_s buf = { NULL, SMM_MAX_RESPONSE_BYTES };
+    char chunk[] = "x";
+    ck_assert_uint_eq (to_buffer (chunk, 1, 1, &buf), 0);
+}
+END_TEST
+
 START_TEST (test_content_type_is_json_plain) { ck_assert_int_eq (smm_content_type_is_json ("application/json"), true); }
 END_TEST
 
@@ -1208,6 +1240,12 @@ smm_suite (void)
     tcase_add_test (tc_url, test_url_path_safe_absolute);
     tcase_add_test (tc_url, test_url_path_safe_null);
     suite_add_tcase (s, tc_url);
+
+    TCase *tc_buffer = tcase_create ("Buffer");
+    tcase_add_test (tc_buffer, test_to_buffer_accumulates);
+    tcase_add_test (tc_buffer, test_to_buffer_rejects_oversized_chunk);
+    tcase_add_test (tc_buffer, test_to_buffer_rejects_when_full);
+    suite_add_tcase (s, tc_buffer);
 
     TCase *tc_content_type = tcase_create ("ContentType");
     tcase_add_test (tc_content_type, test_content_type_is_json_plain);

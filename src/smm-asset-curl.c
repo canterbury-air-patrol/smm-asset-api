@@ -161,6 +161,13 @@ to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 {
     size_t new_bytes = size * nmemb;
     struct buffer_s *buf = (struct buffer_s *)userdata;
+    /* Refuse to grow the buffer past the cap. Returning a short count makes
+     * curl fail the transfer with CURLE_WRITE_ERROR. The comparison is written
+     * to avoid overflow in buf->bytes + new_bytes (+1 for the NUL). */
+    if (buf->bytes >= SMM_MAX_RESPONSE_BYTES || new_bytes > SMM_MAX_RESPONSE_BYTES - buf->bytes)
+    {
+        return 0;
+    }
     char *tmp = realloc (buf->data, buf->bytes + new_bytes + 1);
     if (tmp == NULL)
     {
