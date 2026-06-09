@@ -186,7 +186,9 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     struct curl_slist *headers = NULL;
     bool have_ref = false;
 
-    DEBUG ("(%p, %s, %s, %p)\n", (void *)conn, path, post_data, write_data);
+    /* Never log post_data: for the login request it carries the user's
+     * password. Log only whether a body is present. */
+    DEBUG ("(%p, %s, %s, %p)\n", (void *)conn, path, post_data ? "<redacted body>" : "(none)", write_data);
 
     if (conn == NULL || path == NULL)
     {
