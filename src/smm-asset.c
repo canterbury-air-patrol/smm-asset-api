@@ -383,13 +383,18 @@ smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_a
                 json_t *val = NULL;
                 json_int_t asset_id = -1;
                 json_int_t asset_type_id = -1;
+                bool have_id = false;
                 const char *name = NULL;
                 const char *type = NULL;
                 json_object_foreach (value, key, val)
                 {
                     if (strcmp (key, "id") == 0)
                     {
-                        asset_id = json_integer_value (val);
+                        if (json_is_integer (val))
+                        {
+                            asset_id = json_integer_value (val);
+                            have_id = true;
+                        }
                     }
                     else if (strcmp (key, "type_id") == 0)
                     {
@@ -403,6 +408,15 @@ smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_a
                     {
                         type = json_string_value (val);
                     }
+                }
+                /* The id is required: it is substituted into request URLs
+                 * (position reports, search lookups). Drop any asset that
+                 * lacks a valid integer id rather than issuing requests
+                 * against a sentinel id of -1. */
+                if (!have_id)
+                {
+                    DEBUG ("asset entry has no valid integer id; skipping\n");
+                    continue;
                 }
                 smm_asset new_asset = smm_asset_create (connection, name, type, asset_id, asset_type_id);
                 if (new_asset)
