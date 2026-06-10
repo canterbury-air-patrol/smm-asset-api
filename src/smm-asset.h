@@ -159,6 +159,12 @@ void smm_asset_debugging_set (bool debug);
 /**
  * Connect to the specified smm
  *
+ * This only validates the host and allocates the connection object; it does
+ * not authenticate. Authentication happens lazily on the first request, so the
+ * returned object reports SMM_CONNECTION_NEW (not SMM_CONNECTION_CONNECTED)
+ * until then. To establish the session up front and check the result, call
+ * @ref smm_asset_connection_login.
+ *
  * @param host the URI of the smm server (i.e. https://smm.example.com)
  * @param user the username to authenticate as
  * @param pass the password to authenticate with
@@ -172,13 +178,33 @@ smm_connection smm_asset_connect (const char *host, const char *user, const char
  *
  * Authentication is performed lazily on the first request, so a freshly
  * connected object with a valid host reports SMM_CONNECTION_NEW until a
- * request transitions it to SMM_CONNECTION_CONNECTED (or an error state).
+ * request (or an explicit @ref smm_asset_connection_login) transitions it to
+ * SMM_CONNECTION_CONNECTED (or an error state). Do not gate the first request
+ * on this returning SMM_CONNECTION_CONNECTED; either call
+ * smm_asset_connection_login() first, or simply check the result of the
+ * request itself (e.g. @ref smm_asset_get_assets).
  *
  * @param connection the smm_connection object to check
  *
  * @return The current state of the connection
  */
 smm_connection_status smm_asset_connection_get_state (smm_connection connection);
+
+/**
+ * Authenticate the connection now, rather than waiting for the first request
+ * to trigger login lazily.
+ *
+ * On success the connection transitions to SMM_CONNECTION_CONNECTED; on
+ * failure it reflects the relevant error state (see @ref
+ * smm_asset_connection_get_state and @ref smm_connection_get_last_error).
+ * Calling it when already connected is a cheap no-op. Concurrent calls on the
+ * same connection are serialised internally.
+ *
+ * @param connection the smm_connection object to authenticate
+ *
+ * @return true if the connection is authenticated, false otherwise
+ */
+bool smm_asset_connection_login (smm_connection connection);
 
 /**
  * Enable/disable TLS verification for a connection.

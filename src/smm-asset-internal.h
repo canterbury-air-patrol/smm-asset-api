@@ -137,7 +137,7 @@ struct smm_curl_res_s *smm_connection_curl_retrieve_url (smm_connection conn, co
                                                          size_t (*write_func) (char *ptr, size_t size, size_t nmemb,
                                                                                void *userdata),
                                                          void *write_data, bool json);
-bool smm_asset_connection_login (smm_connection connection);
+/* smm_asset_connection_login is declared in the public header smm-asset.h */
 char *smm_parse_csrf_token (const char *data, size_t len);
 bool smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets *assets,
                        size_t *assets_count);

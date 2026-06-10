@@ -1139,6 +1139,9 @@ START_TEST (test_get_state_null_connection)
 }
 END_TEST
 
+START_TEST (test_connection_login_null) { ck_assert_int_eq (smm_asset_connection_login (NULL), false); }
+END_TEST
+
 START_TEST (test_get_state_initial)
 {
     smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
@@ -1194,6 +1197,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_report_position_sets_asset_error_not_conn);
     tcase_add_test (tc_conn, test_search_action_sets_search_error_not_conn);
     tcase_add_test (tc_conn, test_get_state_null_connection);
+    tcase_add_test (tc_conn, test_connection_login_null);
     tcase_add_test (tc_conn, test_get_state_initial);
     tcase_add_test (tc_conn, test_get_state_invalid_host);
     tcase_add_test (tc_conn, test_debugging_set);
