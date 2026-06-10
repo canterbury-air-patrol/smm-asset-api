@@ -771,11 +771,10 @@ smm_url_path_is_safe (const char *url)
 }
 
 char *
-smm_asset_build_position_url (long long asset_id, double lat, double lon, unsigned int alt, uint16_t heading,
-                              uint8_t fix)
+smm_asset_build_position_url (long long asset_id, double lat, double lon, int alt, uint16_t heading, uint8_t fix)
 {
     char *page = NULL;
-    if (smm_asprintf_c_locale (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%u&heading=%u&fix=%u",
+    if (smm_asprintf_c_locale (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%d&heading=%u&fix=%u",
                                asset_id, lat, lon, alt, heading, fix)
         < 0)
     {
@@ -785,7 +784,7 @@ smm_asset_build_position_url (long long asset_id, double lat, double lon, unsign
 }
 
 bool
-smm_asset_report_position (smm_asset asset, double latitude, double longitude, unsigned int altitude, uint16_t heading,
+smm_asset_report_position (smm_asset asset, double latitude, double longitude, int altitude, uint16_t heading,
                            uint8_t fix)
 {
     if (!asset)
