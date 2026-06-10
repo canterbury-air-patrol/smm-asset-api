@@ -499,6 +499,11 @@ smm_asset_connection_login (smm_connection connection)
     char *csrf_token = NULL;
     smm_connection_status new_state = SMM_CONNECTION_FAILURE;
 
+    if (connection == NULL)
+    {
+        return false;
+    }
+
     /* Serialise concurrent login attempts. If another thread is already
      * logging in, wait for it to finish. When it does, if the connection is
      * now CONNECTED, return success without making another login attempt. */
