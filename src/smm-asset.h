@@ -197,10 +197,18 @@ smm_connection_status smm_asset_connection_get_state (smm_connection connection)
  * On success the connection transitions to SMM_CONNECTION_CONNECTED; on
  * failure it reflects the relevant error state (see @ref
  * smm_asset_connection_get_state and @ref smm_connection_get_last_error).
- * Calling it when already connected is a cheap no-op. Concurrent calls on the
- * same connection are serialised internally.
+ * Concurrent calls on the same connection are serialised internally.
  *
- * @param connection the smm_connection object to authenticate
+ * Calling it on an already-connected connection is a cheap no-op that returns
+ * true. Any other state — including a connection that previously failed to
+ * authenticate (e.g. bad credentials) — causes a fresh login attempt, which
+ * updates the connection's state and last error accordingly; it is not a
+ * no-op, so a repeatedly-failing call will keep re-contacting the server.
+ *
+ * Passing a NULL @a connection is allowed: the call returns false immediately
+ * with no side effects (no state is changed and no last error is recorded).
+ *
+ * @param connection the smm_connection object to authenticate, or NULL
  *
  * @return true if the connection is authenticated, false otherwise
  */
