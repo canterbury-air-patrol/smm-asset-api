@@ -860,6 +860,37 @@ START_TEST (test_https_upgrade_non_http_http_host)
 }
 END_TEST
 
+START_TEST (test_try_https_upgrade_switches_host)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_connection_try_https_upgrade (conn, "https://example.com/accounts/login/"), true);
+    ck_assert_str_eq (conn->host, "https://example.com");
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_try_https_upgrade_rejects_other_host)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_connection_try_https_upgrade (conn, "https://evil.com/accounts/login/"), false);
+    ck_assert_str_eq (conn->host, "http://example.com");
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_try_https_upgrade_null_args)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_connection_try_https_upgrade (conn, NULL), false);
+    ck_assert_int_eq (smm_connection_try_https_upgrade (NULL, "https://example.com/"), false);
+    ck_assert_str_eq (conn->host, "http://example.com");
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_https_upgrade_already_https)
 {
     /* conn is already https — smm_https_upgrade_is_same_host must return false
@@ -1221,6 +1252,9 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_https_upgrade_non_http_http_host);
     tcase_add_test (tc_conn, test_https_upgrade_already_https);
+    tcase_add_test (tc_conn, test_try_https_upgrade_switches_host);
+    tcase_add_test (tc_conn, test_try_https_upgrade_rejects_other_host);
+    tcase_add_test (tc_conn, test_try_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_invalid_host);
     tcase_add_test (tc_conn, test_connect_null_host);
     tcase_add_test (tc_conn, test_connect_null_user);

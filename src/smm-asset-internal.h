@@ -167,6 +167,11 @@ bool smm_httpcode_is_redirect (long httpcode);
  * same host:port — used to guard against redirect-based downgrade attacks. */
 bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect);
 
+/* If redirect_url is a same-host https upgrade of the connection's http
+ * host, switch the connection to the https host and return true. Returns
+ * false (connection unchanged) for any other redirect, or on NULL args. */
+bool smm_connection_try_https_upgrade (smm_connection conn, const char *redirect_url);
+
 /* Returns true if url is a safe relative path: starts with '/', contains
  * no '..' segments, no query ('?'), no fragment ('#'), and no percent-
  * encoded characters ('%'). */
