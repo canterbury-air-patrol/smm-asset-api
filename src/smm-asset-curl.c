@@ -181,6 +181,17 @@ to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
     return new_bytes;
 }
 
+void
+smm_buffer_reset (struct buffer_s *buf)
+{
+    if (buf)
+    {
+        free (buf->data);
+        buf->data = NULL;
+        buf->bytes = 0;
+    }
+}
+
 struct smm_curl_res_s *
 smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const char *post_data,
                                     size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata),
@@ -645,14 +656,13 @@ smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirec
 }
 
 struct smm_curl_res_s *
-smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
-                                  size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata),
-                                  void *write_data, bool json)
+smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data, struct buffer_s *buf,
+                                  bool json)
 {
     bool retry = true;
     int retries = 0;
     struct smm_curl_res_s *res
-        = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data, json);
+        = smm_connection_curl_retrieve_url_r (conn, path, post_data, buf ? to_buffer : NULL, buf, json);
 
     while (retry && retries < 3 && res != NULL)
     {
@@ -698,7 +708,11 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
         if (retry && retries < 3)
         {
             smm_curl_res_free (res);
-            res = smm_connection_curl_retrieve_url_r (conn, path, post_data, write_func, write_data, json);
+            /* Discard anything buffered from the redirect response itself
+             * (proxies often attach an HTML body to a 301/302); otherwise it
+             * would be prepended to the body of the retried request. */
+            smm_buffer_reset (buf);
+            res = smm_connection_curl_retrieve_url_r (conn, path, post_data, buf ? to_buffer : NULL, buf, json);
         }
     }
 

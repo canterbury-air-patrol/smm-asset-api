@@ -698,6 +698,33 @@ START_TEST (test_to_buffer_rejects_when_full)
 }
 END_TEST
 
+START_TEST (test_buffer_reset_discards_content)
+{
+    /* The retry loop resets the buffer between attempts so a redirect body
+     * is not prepended to the body of the retried request. After a reset the
+     * buffer must accumulate only the new content. */
+    struct buffer_s buf = { NULL, 0 };
+    char redirect_body[] = "<html>301 Moved Permanently</html>";
+    char real_body[] = "{\"assets\": []}";
+    ck_assert_uint_eq (to_buffer (redirect_body, 1, sizeof (redirect_body) - 1, &buf), sizeof (redirect_body) - 1);
+    smm_buffer_reset (&buf);
+    ck_assert_ptr_null (buf.data);
+    ck_assert_uint_eq (buf.bytes, 0);
+    ck_assert_uint_eq (to_buffer (real_body, 1, sizeof (real_body) - 1, &buf), sizeof (real_body) - 1);
+    ck_assert_str_eq (buf.data, "{\"assets\": []}");
+    free (buf.data);
+}
+END_TEST
+
+START_TEST (test_buffer_reset_null_safe)
+{
+    struct buffer_s buf = { NULL, 0 };
+    smm_buffer_reset (&buf); /* empty buffer */
+    ck_assert_ptr_null (buf.data);
+    smm_buffer_reset (NULL); /* must not crash */
+}
+END_TEST
+
 START_TEST (test_content_type_is_json_plain) { ck_assert_int_eq (smm_content_type_is_json ("application/json"), true); }
 END_TEST
 
@@ -1307,6 +1334,8 @@ smm_suite (void)
     tcase_add_test (tc_buffer, test_to_buffer_accumulates);
     tcase_add_test (tc_buffer, test_to_buffer_rejects_oversized_chunk);
     tcase_add_test (tc_buffer, test_to_buffer_rejects_when_full);
+    tcase_add_test (tc_buffer, test_buffer_reset_discards_content);
+    tcase_add_test (tc_buffer, test_buffer_reset_null_safe);
     suite_add_tcase (s, tc_buffer);
 
     TCase *tc_content_type = tcase_create ("ContentType");
