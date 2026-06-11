@@ -511,7 +511,11 @@ smm_connection_try_https_upgrade (smm_connection conn, const char *redirect_url)
         return false;
     }
     pthread_mutex_lock (&conn->lock);
-    if (smm_https_upgrade_is_same_host (conn->host, redirect_url))
+    /* smm_https_upgrade_is_same_host only matches hosts with an explicit
+     * "http://" scheme, which is what makes conn->host + 7 below safe. Check
+     * the prefix here too, so the pointer arithmetic cannot silently outlive
+     * that invariant if the validation ever changes. */
+    if (strncmp (conn->host, "http://", 7) == 0 && smm_https_upgrade_is_same_host (conn->host, redirect_url))
     {
         char *new_host = NULL;
         if (asprintf (&new_host, "https://%s", conn->host + 7) >= 0)
