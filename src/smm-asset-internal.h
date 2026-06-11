@@ -169,7 +169,8 @@ bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_re
 
 /* If redirect_url is a same-host https upgrade of the connection's http
  * host, switch the connection to the https host and return true. Returns
- * false (connection unchanged) for any other redirect, or on NULL args. */
+ * false (connection unchanged) for any other redirect, or on NULL args.
+ * Acquires conn->lock internally; callers must not hold conn->lock. */
 bool smm_connection_try_https_upgrade (smm_connection conn, const char *redirect_url);
 
 /* Returns true if url is a safe relative path: starts with '/', contains
