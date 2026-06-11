@@ -487,6 +487,7 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
 
     if (assets == NULL || assets_count == NULL)
     {
+        smm_connection_set_error (connection, SMM_ERROR_INVALID_ARG, "assets and assets_count must be non-NULL");
         return false;
     }
 
@@ -1024,6 +1025,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
     }
     if (waypoints == NULL || waypoints_count == NULL)
     {
+        smm_search_set_error (search, SMM_ERROR_INVALID_ARG, "waypoints and waypoints_count must be non-NULL");
         return false;
     }
 

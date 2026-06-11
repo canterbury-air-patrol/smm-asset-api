@@ -70,8 +70,8 @@ typedef struct
  * - smm_asset_connect() and smm_connection_close() are safe to call from any
  *   thread, but smm_connection_close() must not be called while another thread
  *   is still creating assets or searches from the same connection.
- *   smm_asset_create() acquires a reference on the connection, so closing the
- *   connection before freeing all assets is safe.
+ *   Each asset returned by smm_asset_get_assets() holds a reference on the
+ *   connection, so closing the connection before freeing all assets is safe.
  *
  * - Each smm_asset is owned by a single thread at a time.  Two threads must
  *   not call functions on the same asset concurrently.
@@ -238,8 +238,10 @@ void smm_connection_close (smm_connection connection);
  * Get all the assets that this user account has access to
  *
  * @param connection the smm_connection object to get the assets from
- * @param assets Where to store the assets
- * @param assets_count Where to store how many assets there are
+ * @param assets Where to store the assets (must be non-NULL; otherwise
+ *               SMM_ERROR_INVALID_ARG is recorded on the connection)
+ * @param assets_count Where to store how many assets there are (must be
+ *                     non-NULL, as above)
  *
  * @return true if assets were successfully retrieved (even if there are none), false if there was an error
  */
@@ -353,8 +355,10 @@ uint64_t smm_search_sweep_width (smm_search search);
  * Get all the waypoints associated with a a search
  *
  * @param search the search
- * @param waypoints a place to store the list of waypoints
- * @param waypoints_count a place to store the count of waypoints
+ * @param waypoints a place to store the list of waypoints (must be non-NULL;
+ *                  otherwise SMM_ERROR_INVALID_ARG is recorded on the search)
+ * @param waypoints_count a place to store the count of waypoints (must be
+ *                        non-NULL, as above)
  *
  * @return true if waypoints for the search were stored in waypoints
  */
