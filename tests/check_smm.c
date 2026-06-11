@@ -923,6 +923,10 @@ redirect_server_thread (void *arg)
     if (fd >= 0)
     {
         char req[1024];
+        /* Drain the request; its content does not affect the canned response.
+         * glibc declares read/write warn_unused_result, and gcc ignores a
+         * plain (void) cast for those, so "(void)!" is needed to keep
+         * -Wunused-result (via -Wall, with --enable-werror) quiet. */
         (void)!read (fd, req, sizeof (req));
         const char body[] = "<html><body>301 Moved Permanently</body></html>";
         char resp[512];

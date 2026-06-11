@@ -510,15 +510,19 @@ smm_connection_try_https_upgrade (smm_connection conn, const char *redirect_url)
     {
         return false;
     }
+    static const char http_scheme[] = "http://";
+    const size_t http_scheme_len = sizeof (http_scheme) - 1;
+
     pthread_mutex_lock (&conn->lock);
     /* smm_https_upgrade_is_same_host only matches hosts with an explicit
-     * "http://" scheme, which is what makes conn->host + 7 below safe. Check
-     * the prefix here too, so the pointer arithmetic cannot silently outlive
-     * that invariant if the validation ever changes. */
-    if (strncmp (conn->host, "http://", 7) == 0 && smm_https_upgrade_is_same_host (conn->host, redirect_url))
+     * "http://" scheme, which is what makes skipping the scheme below safe.
+     * Check the prefix here too, so the pointer arithmetic cannot silently
+     * outlive that invariant if the validation ever changes. */
+    if (strncmp (conn->host, http_scheme, http_scheme_len) == 0
+        && smm_https_upgrade_is_same_host (conn->host, redirect_url))
     {
         char *new_host = NULL;
-        if (asprintf (&new_host, "https://%s", conn->host + 7) >= 0)
+        if (asprintf (&new_host, "https://%s", conn->host + http_scheme_len) >= 0)
         {
             free (conn->host);
             conn->host = new_host;
