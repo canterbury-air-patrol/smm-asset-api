@@ -181,6 +181,30 @@ to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
     return new_bytes;
 }
 
+bool
+smm_connection_state_for_curl_error (CURLcode cres, smm_connection_status *state)
+{
+    switch (cres)
+    {
+        case CURLE_URL_MALFORMAT:
+            *state = SMM_CONNECTION_HOST_INVALID;
+            return true;
+        case CURLE_COULDNT_RESOLVE_HOST:
+        case CURLE_COULDNT_CONNECT:
+            *state = SMM_CONNECTION_NO_HOST_CONNECTION;
+            return true;
+        case CURLE_HTTP_RETURNED_ERROR:
+            /* The server was reached and answered; an HTTP-level error (a
+             * 404/500 from one endpoint) says nothing about the connection
+             * or the session, so leave the connection state alone. The
+             * caller's per-object last_error carries the HTTP status. */
+            return false;
+        default:
+            *state = SMM_CONNECTION_FAILURE;
+            return true;
+    }
+}
+
 void
 smm_buffer_reset (struct buffer_s *buf)
 {
@@ -287,21 +311,13 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 
     if (cres != CURLE_OK)
     {
-        pthread_mutex_lock (&conn->lock);
-        switch (cres)
+        smm_connection_status new_state;
+        if (smm_connection_state_for_curl_error (cres, &new_state))
         {
-            case CURLE_URL_MALFORMAT:
-                conn->state = SMM_CONNECTION_HOST_INVALID;
-                break;
-            case CURLE_COULDNT_RESOLVE_HOST:
-            case CURLE_COULDNT_CONNECT:
-                conn->state = SMM_CONNECTION_NO_HOST_CONNECTION;
-                break;
-            default:
-                conn->state = SMM_CONNECTION_FAILURE;
-                break;
+            pthread_mutex_lock (&conn->lock);
+            conn->state = new_state;
+            pthread_mutex_unlock (&conn->lock);
         }
-        pthread_mutex_unlock (&conn->lock);
     }
 
     curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &res->httpcode);

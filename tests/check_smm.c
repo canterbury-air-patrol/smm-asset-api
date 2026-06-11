@@ -1022,6 +1022,30 @@ START_TEST (test_login_in_progress_reset_on_failure)
 }
 END_TEST
 
+START_TEST (test_state_for_curl_error_http_error_keeps_state)
+{
+    /* A 404/500 from one endpoint (CURLE_HTTP_RETURNED_ERROR under
+     * FAILONERROR) must not flip a connected session into a failure state. */
+    smm_connection_status state = SMM_CONNECTION_CONNECTED;
+    ck_assert_int_eq (smm_connection_state_for_curl_error (CURLE_HTTP_RETURNED_ERROR, &state), false);
+    ck_assert_int_eq (state, SMM_CONNECTION_CONNECTED);
+}
+END_TEST
+
+START_TEST (test_state_for_curl_error_connection_failures)
+{
+    smm_connection_status state;
+    ck_assert_int_eq (smm_connection_state_for_curl_error (CURLE_URL_MALFORMAT, &state), true);
+    ck_assert_int_eq (state, SMM_CONNECTION_HOST_INVALID);
+    ck_assert_int_eq (smm_connection_state_for_curl_error (CURLE_COULDNT_RESOLVE_HOST, &state), true);
+    ck_assert_int_eq (state, SMM_CONNECTION_NO_HOST_CONNECTION);
+    ck_assert_int_eq (smm_connection_state_for_curl_error (CURLE_COULDNT_CONNECT, &state), true);
+    ck_assert_int_eq (state, SMM_CONNECTION_NO_HOST_CONNECTION);
+    ck_assert_int_eq (smm_connection_state_for_curl_error (CURLE_OPERATION_TIMEDOUT, &state), true);
+    ck_assert_int_eq (state, SMM_CONNECTION_FAILURE);
+}
+END_TEST
+
 START_TEST (test_invalid_host)
 {
     smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
@@ -1351,6 +1375,8 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_try_https_upgrade_rejects_other_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_eager_login_follows_https_upgrade);
+    tcase_add_test (tc_conn, test_state_for_curl_error_http_error_keeps_state);
+    tcase_add_test (tc_conn, test_state_for_curl_error_connection_failures);
     tcase_add_test (tc_conn, test_invalid_host);
     tcase_add_test (tc_conn, test_connect_null_host);
     tcase_add_test (tc_conn, test_connect_null_user);
