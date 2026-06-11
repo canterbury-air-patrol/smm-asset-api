@@ -116,6 +116,13 @@ struct buffer_s
 };
 
 size_t to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata);
+
+/* Map a failed curl transfer to a connection state. Returns false when the
+ * failure says nothing about the connection itself (CURLE_HTTP_RETURNED_ERROR:
+ * the server was reached and answered, so the session may still be good) and
+ * the state should be left unchanged; otherwise stores the new state. */
+bool smm_connection_state_for_curl_error (CURLcode cres, smm_connection_status *state);
+
 /* Free any accumulated data and return the buffer to its empty state.
  * Safe to call on a NULL buffer or one that never received data. */
 void smm_buffer_reset (struct buffer_s *buf);
