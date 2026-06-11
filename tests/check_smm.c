@@ -621,6 +621,35 @@ START_TEST (test_report_position_sets_asset_error_not_conn)
 }
 END_TEST
 
+START_TEST (test_get_assets_null_outparams_record_invalid_arg)
+{
+    smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_assets assets;
+    size_t count;
+    ck_assert_int_eq (smm_asset_get_assets (conn, NULL, &count), false);
+    ck_assert_int_eq (smm_connection_get_last_error (conn).code, SMM_ERROR_INVALID_ARG);
+    ck_assert_int_eq (smm_asset_get_assets (conn, &assets, NULL), false);
+    ck_assert_int_eq (smm_connection_get_last_error (conn).code, SMM_ERROR_INVALID_ARG);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_get_waypoints_null_outparams_record_invalid_arg)
+{
+    const char *json = "{\"object_url\": \"/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    ck_assert_ptr_nonnull (search);
+    smm_waypoints waypoints;
+    size_t count;
+    ck_assert_int_eq (smm_search_get_waypoints (search, NULL, &count), false);
+    ck_assert_int_eq (smm_search_get_last_error (search).code, SMM_ERROR_INVALID_ARG);
+    ck_assert_int_eq (smm_search_get_waypoints (search, &waypoints, NULL), false);
+    ck_assert_int_eq (smm_search_get_last_error (search).code, SMM_ERROR_INVALID_ARG);
+    smm_search_destroy (search);
+}
+END_TEST
+
 START_TEST (test_search_action_sets_search_error_not_conn)
 {
     /* With conn==NULL the network call fails; the error must land on the
@@ -1390,6 +1419,8 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_search_get_last_error_initial);
     tcase_add_test (tc_conn, test_report_position_sets_asset_error_not_conn);
     tcase_add_test (tc_conn, test_search_action_sets_search_error_not_conn);
+    tcase_add_test (tc_conn, test_get_assets_null_outparams_record_invalid_arg);
+    tcase_add_test (tc_conn, test_get_waypoints_null_outparams_record_invalid_arg);
     tcase_add_test (tc_conn, test_get_state_null_connection);
     tcase_add_test (tc_conn, test_connection_login_null);
     tcase_add_test (tc_conn, test_get_state_initial);
