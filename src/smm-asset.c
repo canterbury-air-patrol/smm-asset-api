@@ -494,7 +494,7 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
     *assets_count = 0;
     smm_connection_clear_error (connection);
 
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, to_buffer, &buf, true);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (connection, "/assets/", NULL, &buf, true);
     if (res == NULL)
     {
         smm_connection_set_error (connection, SMM_ERROR_NETWORK, "network failure fetching /assets/");
@@ -800,7 +800,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, i
     }
     smm_asset_clear_error (asset);
 
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, &buf, false);
     if (res == NULL)
     {
         smm_asset_set_error (asset, SMM_ERROR_NETWORK, "network failure reporting position");
@@ -1031,8 +1031,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
     *waypoints_count = 0;
     smm_search_clear_error (search);
 
-    struct smm_curl_res_s *res
-        = smm_connection_curl_retrieve_url (search->conn, search->url, NULL, to_buffer, &buf, true);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, search->url, NULL, &buf, true);
 
     if (res == NULL)
     {
@@ -1075,8 +1074,7 @@ smm_search_action (smm_search search, const char *action)
     }
     smm_search_clear_error (search);
 
-    struct smm_curl_res_s *res
-        = smm_connection_curl_retrieve_url (search->conn, action_page, NULL, to_buffer, &buf, false);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, action_page, NULL, &buf, false);
     if (res == NULL)
     {
         smm_search_set_error (search, SMM_ERROR_NETWORK, "network failure sending %s action", action);
@@ -1208,7 +1206,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     }
     smm_asset_clear_error (asset);
 
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, to_buffer, &buf, false);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, &buf, false);
     if (res == NULL)
     {
         smm_asset_set_error (asset, SMM_ERROR_NETWORK, "network failure fetching closest search");

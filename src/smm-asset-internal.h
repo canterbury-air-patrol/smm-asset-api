@@ -116,6 +116,9 @@ struct buffer_s
 };
 
 size_t to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata);
+/* Free any accumulated data and return the buffer to its empty state.
+ * Safe to call on a NULL buffer or one that never received data. */
+void smm_buffer_reset (struct buffer_s *buf);
 
 bool smm_connection_share_init (smm_connection conn);
 void smm_connection_share_destroy (smm_connection conn);
@@ -133,10 +136,12 @@ struct smm_curl_res_s *smm_connection_curl_retrieve_url_r (smm_connection conn, 
                                                            size_t (*write_func) (char *ptr, size_t size, size_t nmemb,
                                                                                  void *userdata),
                                                            void *write_data, bool json);
+/* Retrying fetch: follows the same-host HTTPS upgrade and the login redirect
+ * (up to 3 attempts). The response body is accumulated into buf (which is
+ * reset between attempts so redirect bodies are discarded); pass NULL to
+ * discard the body entirely. */
 struct smm_curl_res_s *smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const char *post_data,
-                                                         size_t (*write_func) (char *ptr, size_t size, size_t nmemb,
-                                                                               void *userdata),
-                                                         void *write_data, bool json);
+                                                         struct buffer_s *buf, bool json);
 /* smm_asset_connection_login is declared in the public header smm-asset.h */
 char *smm_parse_csrf_token (const char *data, size_t len);
 bool smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets *assets,
