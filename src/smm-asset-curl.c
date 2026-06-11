@@ -503,6 +503,33 @@ smm_parse_csrf_token (const char *data, size_t len)
 }
 
 bool
+smm_connection_try_https_upgrade (smm_connection conn, const char *redirect_url)
+{
+    bool upgraded = false;
+    if (conn == NULL || redirect_url == NULL)
+    {
+        return false;
+    }
+    pthread_mutex_lock (&conn->lock);
+    if (smm_https_upgrade_is_same_host (conn->host, redirect_url))
+    {
+        char *new_host = NULL;
+        if (asprintf (&new_host, "https://%s", conn->host + 7) >= 0)
+        {
+            free (conn->host);
+            conn->host = new_host;
+            upgraded = true;
+        }
+        else
+        {
+            DEBUG ("Failed to create new host\n");
+        }
+    }
+    pthread_mutex_unlock (&conn->lock);
+    return upgraded;
+}
+
+bool
 smm_asset_connection_login (smm_connection connection)
 {
     bool res = false;
@@ -537,6 +564,23 @@ smm_asset_connection_login (smm_connection connection)
      * itself does not recurse back into smm_asset_connection_login. */
     struct smm_curl_res_s *res_get
         = smm_connection_curl_retrieve_url_r (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
+
+    /* The server may answer a plain-http login GET with a same-host redirect
+     * to https (e.g. Django's SECURE_SSL_REDIRECT or a proxy rule). The lazy
+     * request path performs this upgrade, so do the same here rather than
+     * failing an eager login that the lazy path would have survived. One
+     * attempt only; any other redirect is still a failure. */
+    if (res_get && res_get->success && smm_httpcode_is_redirect (res_get->httpcode)
+        && smm_connection_try_https_upgrade (connection, res_get->redirect_url))
+    {
+        DEBUG ("Upgrading login to https\n");
+        smm_curl_res_free (res_get);
+        /* Drop anything the redirect response wrote into the tidy buffer. */
+        tidyBufFree (&docbuf);
+        tidyBufInit (&docbuf);
+        res_get
+            = smm_connection_curl_retrieve_url_r (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
+    }
 
     if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
     {
@@ -672,24 +716,11 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
         {
             DEBUG ("Got redirected to (%s) accessing %s\n", res->redirect_url, path);
             /* It's possible we need to upgrade to https */
-            pthread_mutex_lock (&conn->lock);
-            if (smm_https_upgrade_is_same_host (conn->host, res->redirect_url))
+            if (smm_connection_try_https_upgrade (conn, res->redirect_url))
             {
-                /* Upgrade to https — same host, just switch the scheme */
                 DEBUG ("Upgrading to https\n");
-                char *new_host = NULL;
-                if (asprintf (&new_host, "https://%s", conn->host + 7) >= 0)
-                {
-                    free (conn->host);
-                    conn->host = new_host;
-                    retry = true;
-                }
-                else
-                {
-                    DEBUG ("Failed to create new host\n");
-                }
+                retry = true;
             }
-            pthread_mutex_unlock (&conn->lock);
 
             if (!retry && strstr (res->redirect_url, "accounts/login") != NULL)
             {
