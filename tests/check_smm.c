@@ -1,10 +1,15 @@
 #include "smm-asset-internal.h"
 #include "smm-asset.h"
+#include <arpa/inet.h>
 #include <check.h>
 #include <locale.h>
+#include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 START_TEST (test_csrf_extraction)
 {
@@ -899,6 +904,92 @@ START_TEST (test_https_upgrade_already_https)
 }
 END_TEST
 
+/* Minimal single-purpose HTTP server for the eager-login upgrade test: the
+ * first connection is answered with a same-host https 301 (carrying an HTML
+ * body, as proxies do); the second connection — the upgraded retry, which
+ * arrives speaking TLS — is closed immediately so the login fails fast. */
+struct redirect_server_s
+{
+    int listen_fd;
+    uint16_t port;
+};
+
+static void *
+redirect_server_thread (void *arg)
+{
+    struct redirect_server_s *srv = (struct redirect_server_s *)arg;
+
+    int fd = accept (srv->listen_fd, NULL, NULL);
+    if (fd >= 0)
+    {
+        char req[1024];
+        (void)!read (fd, req, sizeof (req));
+        const char body[] = "<html><body>301 Moved Permanently</body></html>";
+        char resp[512];
+        int n = snprintf (resp, sizeof (resp),
+                          "HTTP/1.1 301 Moved Permanently\r\n"
+                          "Location: https://127.0.0.1:%u/accounts/login/\r\n"
+                          "Content-Type: text/html\r\n"
+                          "Content-Length: %zu\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s",
+                          srv->port, sizeof (body) - 1, body);
+        (void)!write (fd, resp, (size_t)n);
+        close (fd);
+    }
+
+    /* The upgraded retry: close without answering the TLS handshake. If the
+     * retry never happens (regression), this accept blocks and the test is
+     * failed by the check timeout. */
+    fd = accept (srv->listen_fd, NULL, NULL);
+    if (fd >= 0)
+    {
+        close (fd);
+    }
+    return NULL;
+}
+
+START_TEST (test_eager_login_follows_https_upgrade)
+{
+    struct redirect_server_s srv;
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+
+    srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
+    ck_assert_int_ge (srv.listen_fd, 0);
+    memset (&addr, 0, sizeof (addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    addr.sin_port = 0; /* ephemeral */
+    ck_assert_int_eq (bind (srv.listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
+    ck_assert_int_eq (listen (srv.listen_fd, 2), 0);
+    ck_assert_int_eq (getsockname (srv.listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
+    srv.port = ntohs (addr.sin_port);
+
+    pthread_t thread;
+    ck_assert_int_eq (pthread_create (&thread, NULL, redirect_server_thread, &srv), 0);
+
+    char host[64];
+    snprintf (host, sizeof (host), "http://127.0.0.1:%u", srv.port);
+    smm_connection conn = smm_asset_connect (host, "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+
+    /* The login itself fails (the upgraded retry reaches a socket that does
+     * not speak TLS), but the redirect must have switched the connection to
+     * the https host — that retry happening at all is the regression this
+     * test covers. */
+    ck_assert_int_eq (smm_asset_connection_login (conn), false);
+    char expected_host[64];
+    snprintf (expected_host, sizeof (expected_host), "https://127.0.0.1:%u", srv.port);
+    ck_assert_str_eq (conn->host, expected_host);
+
+    pthread_join (thread, NULL);
+    close (srv.listen_fd);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_curl_retrieve_url_r_returns_null_on_no_response)
 {
     /* Exercises the httpcode==0 cleanup path in smm_connection_curl_retrieve_url_r.
@@ -1255,6 +1346,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_try_https_upgrade_switches_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_rejects_other_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_null_args);
+    tcase_add_test (tc_conn, test_eager_login_follows_https_upgrade);
     tcase_add_test (tc_conn, test_invalid_host);
     tcase_add_test (tc_conn, test_connect_null_host);
     tcase_add_test (tc_conn, test_connect_null_user);
