@@ -165,7 +165,9 @@ void smm_asset_debugging_set (bool debug);
  * until then. To establish the session up front and check the result, call
  * @ref smm_asset_connection_login.
  *
- * @param host the URI of the smm server (i.e. https://smm.example.com)
+ * @param host the URI of the smm server (i.e. https://smm.example.com); any
+ *             trailing '/' is ignored, and a base path is allowed (i.e.
+ *             https://example.com/smm)
  * @param user the username to authenticate as
  * @param pass the password to authenticate with
  *

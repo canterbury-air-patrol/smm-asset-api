@@ -1377,6 +1377,71 @@ START_TEST (test_get_state_invalid_host)
 }
 END_TEST
 
+START_TEST (test_connect_strips_trailing_slash)
+{
+    /* Request paths always start with '/', so a trailing '/' on the host
+     * would otherwise yield "http://example.com//assets/". */
+    smm_connection conn = smm_asset_connect ("http://example.com/", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_str_eq (conn->host, "http://example.com");
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_NEW);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connect_strips_multiple_trailing_slashes)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com///", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_str_eq (conn->host, "http://example.com");
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connect_no_trailing_slash_unchanged)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com:8080", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_str_eq (conn->host, "http://example.com:8080");
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connect_base_path_trailing_slash)
+{
+    /* A base path (server behind a reverse-proxy subpath) keeps the path but
+     * loses the trailing '/' so request paths concatenate cleanly. */
+    smm_connection conn = smm_asset_connect ("https://example.com/smm/", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_str_eq (conn->host, "https://example.com/smm");
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_NEW);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_preserves_base_path)
+{
+    /* The https upgrade rebuilds the host from the part after "http://", so a
+     * base path must survive the scheme switch. */
+    smm_connection conn = smm_asset_connect ("http://example.com/smm/", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_connection_try_https_upgrade (conn, "https://example.com/accounts/login/"), true);
+    ck_assert_str_eq (conn->host, "https://example.com/smm");
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connect_only_slashes_is_invalid)
+{
+    /* Degenerate input that normalises to the empty string must be reported
+     * as an invalid host, not silently accepted. */
+    smm_connection conn = smm_asset_connect ("///", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
+    smm_connection_close (conn);
+}
+END_TEST
+
 Suite *
 smm_suite (void)
 {
@@ -1425,6 +1490,12 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_connection_login_null);
     tcase_add_test (tc_conn, test_get_state_initial);
     tcase_add_test (tc_conn, test_get_state_invalid_host);
+    tcase_add_test (tc_conn, test_connect_strips_trailing_slash);
+    tcase_add_test (tc_conn, test_connect_strips_multiple_trailing_slashes);
+    tcase_add_test (tc_conn, test_connect_no_trailing_slash_unchanged);
+    tcase_add_test (tc_conn, test_connect_base_path_trailing_slash);
+    tcase_add_test (tc_conn, test_https_upgrade_preserves_base_path);
+    tcase_add_test (tc_conn, test_connect_only_slashes_is_invalid);
     tcase_add_test (tc_conn, test_debugging_set);
     suite_add_tcase (s, tc_conn);
 

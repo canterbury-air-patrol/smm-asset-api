@@ -134,6 +134,17 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
         return NULL;
     }
 
+    /* Normalise away trailing '/'s: request paths always start with '/', so a
+     * host of "http://example.com/" would otherwise produce double-slash URLs
+     * such as "http://example.com//assets/", which only work behind proxies
+     * that merge slashes. Also makes a base path like
+     * "https://example.com/smm/" concatenate correctly. */
+    size_t host_len = strlen (conn->host);
+    while (host_len > 0 && conn->host[host_len - 1] == '/')
+    {
+        conn->host[--host_len] = '\0';
+    }
+
     pthread_mutex_init (&conn->lock, NULL);
     conn->login_in_progress = false;
     pthread_cond_init (&conn->login_cond, NULL);
@@ -143,11 +154,11 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
         return NULL;
     }
 
-    /* Early host validation */
+    /* Early host validation, on the normalised host actually used in URLs */
     CURLU *curlu = curl_url ();
     if (curlu)
     {
-        if (curl_url_set (curlu, CURLUPART_URL, host, 0) != CURLUE_OK)
+        if (curl_url_set (curlu, CURLUPART_URL, conn->host, 0) != CURLUE_OK)
         {
             conn->state = SMM_CONNECTION_HOST_INVALID;
         }
