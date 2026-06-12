@@ -574,8 +574,9 @@ END_TEST
 
 START_TEST (test_asset_get_last_error_null)
 {
-    smm_error err = smm_asset_get_last_error (NULL);
-    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    char msg[16] = "sentinel";
+    ck_assert_int_eq (smm_asset_get_last_error (NULL, msg, sizeof (msg)), SMM_ERROR_NONE);
+    ck_assert_str_eq (msg, "");
 }
 END_TEST
 
@@ -583,16 +584,18 @@ START_TEST (test_asset_get_last_error_initial)
 {
     smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
     ck_assert_ptr_nonnull (asset);
-    smm_error err = smm_asset_get_last_error (asset);
-    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    char msg[64];
+    ck_assert_int_eq (smm_asset_get_last_error (asset, msg, sizeof (msg)), SMM_ERROR_NONE);
+    ck_assert_str_eq (msg, "");
     smm_asset_free_asset (asset);
 }
 END_TEST
 
 START_TEST (test_search_get_last_error_null)
 {
-    smm_error err = smm_search_get_last_error (NULL);
-    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    char msg[16] = "sentinel";
+    ck_assert_int_eq (smm_search_get_last_error (NULL, msg, sizeof (msg)), SMM_ERROR_NONE);
+    ck_assert_str_eq (msg, "");
 }
 END_TEST
 
@@ -601,8 +604,9 @@ START_TEST (test_search_get_last_error_initial)
     const char *json = "{\"object_url\": \"/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
     smm_search search = smm_parse_search_json (NULL, json, strlen (json));
     ck_assert_ptr_nonnull (search);
-    smm_error err = smm_search_get_last_error (search);
-    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    char msg[64];
+    ck_assert_int_eq (smm_search_get_last_error (search, msg, sizeof (msg)), SMM_ERROR_NONE);
+    ck_assert_str_eq (msg, "");
     smm_search_destroy (search);
 }
 END_TEST
@@ -615,8 +619,27 @@ START_TEST (test_report_position_sets_asset_error_not_conn)
     smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
     ck_assert_ptr_nonnull (asset);
     smm_asset_report_position (asset, -43.5, 172.6, 100, 270, 3);
-    smm_error err = smm_asset_get_last_error (asset);
-    ck_assert_int_ne (err.code, SMM_ERROR_NONE);
+    char msg[256];
+    ck_assert_int_ne (smm_asset_get_last_error (asset, msg, sizeof (msg)), SMM_ERROR_NONE);
+    /* A real error must come with a human-readable description. */
+    ck_assert_int_gt (strlen (msg), 0);
+    smm_asset_free_asset (asset);
+}
+END_TEST
+
+START_TEST (test_get_last_error_message_truncated_to_buffer)
+{
+    /* A message longer than the caller's buffer is truncated and still
+     * NUL-terminated; the code is unaffected. */
+    smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+    smm_asset_report_position (asset, -43.5, 172.6, 100, 270, 3);
+    char tiny[4];
+    ck_assert_int_ne (smm_asset_get_last_error (asset, tiny, sizeof (tiny)), SMM_ERROR_NONE);
+    ck_assert_uint_eq (strlen (tiny), sizeof (tiny) - 1);
+    /* NULL message / zero length only query the code. */
+    ck_assert_int_ne (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_NONE);
+    ck_assert_int_ne (smm_asset_get_last_error (asset, tiny, 0), SMM_ERROR_NONE);
     smm_asset_free_asset (asset);
 }
 END_TEST
@@ -628,9 +651,9 @@ START_TEST (test_get_assets_null_outparams_record_invalid_arg)
     smm_assets assets;
     size_t count;
     ck_assert_int_eq (smm_asset_get_assets (conn, NULL, &count), false);
-    ck_assert_int_eq (smm_connection_get_last_error (conn).code, SMM_ERROR_INVALID_ARG);
+    ck_assert_int_eq (smm_connection_get_last_error (conn, NULL, 0), SMM_ERROR_INVALID_ARG);
     ck_assert_int_eq (smm_asset_get_assets (conn, &assets, NULL), false);
-    ck_assert_int_eq (smm_connection_get_last_error (conn).code, SMM_ERROR_INVALID_ARG);
+    ck_assert_int_eq (smm_connection_get_last_error (conn, NULL, 0), SMM_ERROR_INVALID_ARG);
     smm_connection_close (conn);
 }
 END_TEST
@@ -643,9 +666,9 @@ START_TEST (test_get_waypoints_null_outparams_record_invalid_arg)
     smm_waypoints waypoints;
     size_t count;
     ck_assert_int_eq (smm_search_get_waypoints (search, NULL, &count), false);
-    ck_assert_int_eq (smm_search_get_last_error (search).code, SMM_ERROR_INVALID_ARG);
+    ck_assert_int_eq (smm_search_get_last_error (search, NULL, 0), SMM_ERROR_INVALID_ARG);
     ck_assert_int_eq (smm_search_get_waypoints (search, &waypoints, NULL), false);
-    ck_assert_int_eq (smm_search_get_last_error (search).code, SMM_ERROR_INVALID_ARG);
+    ck_assert_int_eq (smm_search_get_last_error (search, NULL, 0), SMM_ERROR_INVALID_ARG);
     smm_search_destroy (search);
 }
 END_TEST
@@ -660,8 +683,7 @@ START_TEST (test_search_action_sets_search_error_not_conn)
     search_s.asset_id = 1;
     search_s.url = strdup ("/search/1/");
     smm_search_accept (&search_s);
-    smm_error err = smm_search_get_last_error (&search_s);
-    ck_assert_int_ne (err.code, SMM_ERROR_NONE);
+    ck_assert_int_ne (smm_search_get_last_error (&search_s, NULL, 0), SMM_ERROR_NONE);
     free (search_s.url);
 }
 END_TEST
@@ -1347,8 +1369,9 @@ END_TEST
 
 START_TEST (test_get_last_error_null_connection)
 {
-    smm_error err = smm_connection_get_last_error (NULL);
-    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    char msg[16] = "sentinel";
+    ck_assert_int_eq (smm_connection_get_last_error (NULL, msg, sizeof (msg)), SMM_ERROR_NONE);
+    ck_assert_str_eq (msg, "");
 }
 END_TEST
 
@@ -1356,8 +1379,9 @@ START_TEST (test_get_last_error_initial)
 {
     smm_connection conn = smm_asset_connect ("http://localhost/", "user", "pass");
     ck_assert_ptr_nonnull (conn);
-    smm_error err = smm_connection_get_last_error (conn);
-    ck_assert_int_eq (err.code, SMM_ERROR_NONE);
+    char msg[64];
+    ck_assert_int_eq (smm_connection_get_last_error (conn, msg, sizeof (msg)), SMM_ERROR_NONE);
+    ck_assert_str_eq (msg, "");
     smm_connection_close (conn);
 }
 END_TEST
@@ -1498,6 +1522,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_search_get_last_error_null);
     tcase_add_test (tc_conn, test_search_get_last_error_initial);
     tcase_add_test (tc_conn, test_report_position_sets_asset_error_not_conn);
+    tcase_add_test (tc_conn, test_get_last_error_message_truncated_to_buffer);
     tcase_add_test (tc_conn, test_search_action_sets_search_error_not_conn);
     tcase_add_test (tc_conn, test_get_assets_null_outparams_record_invalid_arg);
     tcase_add_test (tc_conn, test_get_waypoints_null_outparams_record_invalid_arg);

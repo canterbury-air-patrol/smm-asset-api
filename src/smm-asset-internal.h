@@ -59,6 +59,16 @@ extern _Atomic bool smm_debug;
         }                                                                                                              \
     } while (0)
 
+/* Snapshot of the most recent error recorded on an object. Internal only:
+ * the public API returns the code and copies the message into a caller
+ * buffer (smm_*_get_last_error), so this layout — in particular the message
+ * size — can change without affecting the ABI. */
+typedef struct
+{
+    smm_error_code code;
+    char message[256];
+} smm_error;
+
 struct smm_connection_s
 {
     char *host;
