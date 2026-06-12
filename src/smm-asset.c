@@ -23,6 +23,7 @@
 #include "smm-asset.h"
 #include "smm-asset-internal.h"
 
+#include <inttypes.h>
 #include <locale.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -820,10 +821,11 @@ smm_url_path_is_safe (const char *url)
 }
 
 char *
-smm_asset_build_position_url (long long asset_id, double lat, double lon, int alt, uint16_t heading, uint8_t fix)
+smm_asset_build_position_url (long long asset_id, double lat, double lon, int32_t alt, uint16_t heading, uint8_t fix)
 {
     char *page = NULL;
-    if (smm_asprintf_c_locale (&page, "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%d&heading=%u&fix=%u",
+    if (smm_asprintf_c_locale (&page,
+                               "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%" PRId32 "&heading=%u&fix=%u",
                                asset_id, lat, lon, alt, heading, fix)
         < 0)
     {
@@ -833,7 +835,7 @@ smm_asset_build_position_url (long long asset_id, double lat, double lon, int al
 }
 
 bool
-smm_asset_report_position (smm_asset asset, double latitude, double longitude, int altitude, uint16_t heading,
+smm_asset_report_position (smm_asset asset, double latitude, double longitude, int32_t altitude, uint16_t heading,
                            uint8_t fix)
 {
     if (!asset)

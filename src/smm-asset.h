@@ -303,7 +303,7 @@ const char *smm_asset_type (smm_asset asset);
  *
  * @return true if the position was reported to the server
  */
-bool smm_asset_report_position (smm_asset asset, double latitude, double longitude, int altitude, uint16_t heading,
+bool smm_asset_report_position (smm_asset asset, double latitude, double longitude, int32_t altitude, uint16_t heading,
                                 uint8_t fix);
 
 /**
