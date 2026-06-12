@@ -35,6 +35,12 @@
 #define SMM_VERSION_STRING "1.0.0"
 
 /**
+ * Numeric library version: (major << 16) | (minor << 8) | patch.
+ * Suitable for comparisons, e.g. #if SMM_VERSION_NUMBER >= 0x010100.
+ */
+#define SMM_VERSION_NUMBER ((SMM_VERSION_MAJOR << 16) | (SMM_VERSION_MINOR << 8) | SMM_VERSION_PATCH)
+
+/**
  * Error codes returned by smm_connection_get_last_error()
  */
 typedef enum
@@ -147,6 +153,24 @@ typedef enum
     SMM_COMMAND_MISSION_COMPLETE, /*!< The mission has concluded, return to base */
     SMM_COMMAND_UNKNOWN,          /*!< The command from the server is not known */
 } smm_asset_command;
+
+/**
+ * Get the version string of the library linked at runtime.
+ *
+ * This may differ from the SMM_VERSION_STRING the application was compiled
+ * against when a different library version is installed.
+ *
+ * @return a static string such as "1.0.0"; do not free it
+ */
+const char *smm_asset_version_string (void);
+
+/**
+ * Get the numeric version of the library linked at runtime.
+ *
+ * @return the version in @ref SMM_VERSION_NUMBER format:
+ *         (major << 16) | (minor << 8) | patch
+ */
+unsigned int smm_asset_version_number (void);
 
 /**
  * Enable/disable the debugging

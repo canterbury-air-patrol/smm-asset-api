@@ -1322,6 +1322,18 @@ START_TEST (test_debugging_set)
 }
 END_TEST
 
+START_TEST (test_version_runtime_matches_headers)
+{
+    /* The runtime queries must agree with the macros the tests were compiled
+     * against (the tests always run against the just-built library). */
+    ck_assert_str_eq (smm_asset_version_string (), SMM_VERSION_STRING);
+    ck_assert_uint_eq (smm_asset_version_number (), SMM_VERSION_NUMBER);
+    ck_assert_uint_eq (smm_asset_version_number () >> 16, SMM_VERSION_MAJOR);
+    ck_assert_uint_eq ((smm_asset_version_number () >> 8) & 0xff, SMM_VERSION_MINOR);
+    ck_assert_uint_eq (smm_asset_version_number () & 0xff, SMM_VERSION_PATCH);
+}
+END_TEST
+
 START_TEST (test_connection_login_fields_initialised)
 {
     smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
@@ -1500,6 +1512,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_https_upgrade_preserves_base_path);
     tcase_add_test (tc_conn, test_connect_only_slashes_is_invalid);
     tcase_add_test (tc_conn, test_debugging_set);
+    tcase_add_test (tc_conn, test_version_runtime_matches_headers);
     suite_add_tcase (s, tc_conn);
 
     TCase *tc_position = tcase_create ("Position");

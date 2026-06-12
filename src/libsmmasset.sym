@@ -12,6 +12,8 @@ smm_asset_last_goto_pos
 smm_asset_name
 smm_asset_report_position
 smm_asset_type
+smm_asset_version_number
+smm_asset_version_string
 smm_connection_close
 smm_connection_get_last_error
 smm_search_accept
