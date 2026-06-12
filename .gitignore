@@ -21,6 +21,16 @@ src/smm-asset.pc
 *.tar.gz
 *~
 
+# dpkg-buildpackage artifacts
+debian/.debhelper/
+debian/tmp/
+debian/libsmmasset0/
+debian/libsmm-asset-dev/
+debian/files
+debian/debhelper-build-stamp
+debian/*.substvars
+debian/*.debhelper
+
 # check-code.sh / static analysis artifacts
 compile_commands.json
 clang-tidy.log

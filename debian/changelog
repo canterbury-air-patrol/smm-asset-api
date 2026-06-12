@@ -4,6 +4,11 @@ libsmm-asset (1.0.0) unstable; urgency=medium
   * Versioned ABI (SONAME libsmmasset.so.0) exporting only the public API.
   * Structured per-object error reporting and runtime version queries.
   * Hardened HTTP handling; see NEWS for the full summary.
+  * Split packaging into libsmmasset0 (runtime) and libsmm-asset-dev
+    (header, development symlink, pkg-config file), replacing the single
+    libsmm-asset package. The -dev package depends on the libcurl, jansson
+    and tidy development packages that smm-asset.pc requires.
+  * Stop shipping the libtool archive (.la).
 
  -- Scott Parlane <sjp@canterburyairpatrol.org>  Fri, 12 Jun 2026 00:00:00 +0000
 

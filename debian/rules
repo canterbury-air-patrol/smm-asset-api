@@ -1,13 +1,10 @@
 #!/usr/bin/make -f
-DISTRIBUTION = $(shell sed -n "s/^VERSION_CODENAME=//p" /etc/os-release)
 
+# autoreconf runs by default under debhelper compat 13. The old special-case
+# for stretch/bionic (no tidy.pc) supported distributions that are now EOL.
 %:
-	dh $@ --with autoreconf 
+	dh $@
 
-override_dh_auto_configure:
-	if [ "$(DISTRIBUTION)" = "bionic" ] || [ "$(DISTRIBUTION)" = "stretch" ]; \
-	then \
-		dh_auto_configure -- TIDY_LIBS=-ltidy TIDY_CFLAGS=-I/usr/include ; \
-	else \
-		dh_auto_configure -- ; \
-	fi
+# Debian does not ship libtool archives; they cause overlinking.
+execute_after_dh_auto_install:
+	rm -f debian/tmp/usr/lib/*/libsmmasset.la
