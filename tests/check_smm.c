@@ -1437,6 +1437,9 @@ START_TEST (test_connect_only_slashes_is_invalid)
      * as an invalid host, not silently accepted. */
     smm_connection conn = smm_asset_connect ("///", "user", "pass");
     ck_assert_ptr_nonnull (conn);
+    /* Normalisation ran before validation: every slash was stripped, and it
+     * is that empty host the validation then rejected. */
+    ck_assert_str_eq (conn->host, "");
     ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
     smm_connection_close (conn);
 }
