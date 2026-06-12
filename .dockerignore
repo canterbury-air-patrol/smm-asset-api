@@ -1,0 +1,42 @@
+# The tester image runs autogen.sh/configure/make itself, so host build
+# artifacts must not leak into the container build: stale objects with fresh
+# timestamps can short-circuit make and link host-toolchain output inside the
+# container. Mirrors .gitignore, plus .git and local-only directories.
+.git
+.claude
+todo
+**/*.o
+**/*.lo
+**/*.la
+**/.libs
+**/.deps
+**/Makefile
+**/Makefile.in
+configure
+config.guess
+config.sub
+config.h
+config.h.in
+config.log
+config.status
+aclocal.m4
+autom4te.cache
+libtool
+ltmain.sh
+m4
+compile
+depcomp
+install-sh
+missing
+ar-lib
+stamp-h1
+test-driver
+compile_commands.json
+clang-tidy.log
+*.tar.gz
+src/smm-asset.pc
+tests/check_smm
+tests/integration_test
+tests/*.log
+tests/*.trs
+**/*~
