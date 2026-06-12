@@ -55,15 +55,6 @@ typedef enum
 } smm_error_code;
 
 /**
- * Structured error detail attached to an smm_connection.
- */
-typedef struct
-{
-    smm_error_code code; /*!< Machine-readable error code */
-    char message[256];   /*!< Human-readable description */
-} smm_error;
-
-/**
  * @section thread_safety Thread-safety guarantees
  *
  * - A single smm_connection may be shared across threads.  The connection's
@@ -437,14 +428,17 @@ void smm_waypoints_free (smm_waypoints waypoints, size_t waypoints_count);
  * stored on the respective asset or search object; use
  * smm_asset_get_last_error() and smm_search_get_last_error() instead.
  *
- * Returns a snapshot of the last error, copied under the connection lock.
- * Safe to call concurrently with other library functions.
- * Returns a zeroed smm_error (code == SMM_ERROR_NONE) if connection is NULL.
+ * The code and message are a consistent snapshot of one error, copied
+ * together under the connection lock.  Safe to call concurrently with other
+ * library functions.
  *
- * @param connection the smm_connection to query
- * @return a copy of the last recorded error
+ * @param connection the smm_connection to query; NULL reports SMM_ERROR_NONE
+ * @param message buffer for the NUL-terminated human-readable description
+ *                (truncated to fit), or NULL to query only the code
+ * @param message_len size of @a message in bytes; ignored when message is NULL
+ * @return the machine-readable code of the last recorded error
  */
-smm_error smm_connection_get_last_error (smm_connection connection);
+smm_error_code smm_connection_get_last_error (smm_connection connection, char *message, size_t message_len);
 
 /**
  * Retrieve the most recent error recorded on an asset.
@@ -454,12 +448,13 @@ smm_error smm_connection_get_last_error (smm_connection connection);
  * operations on different assets sharing the same connection do not
  * clobber each other's error state.
  *
- * Returns a zeroed smm_error (code == SMM_ERROR_NONE) if asset is NULL.
- *
- * @param asset the smm_asset to query
- * @return a copy of the last recorded error
+ * @param asset the smm_asset to query; NULL reports SMM_ERROR_NONE
+ * @param message buffer for the NUL-terminated human-readable description
+ *                (truncated to fit), or NULL to query only the code
+ * @param message_len size of @a message in bytes; ignored when message is NULL
+ * @return the machine-readable code of the last recorded error
  */
-smm_error smm_asset_get_last_error (smm_asset asset);
+smm_error_code smm_asset_get_last_error (smm_asset asset, char *message, size_t message_len);
 
 /**
  * Retrieve the most recent error recorded on a search.
@@ -469,9 +464,10 @@ smm_error smm_asset_get_last_error (smm_asset asset);
  * concurrent operations on different searches sharing the same connection
  * do not clobber each other's error state.
  *
- * Returns a zeroed smm_error (code == SMM_ERROR_NONE) if search is NULL.
- *
- * @param search the smm_search to query
- * @return a copy of the last recorded error
+ * @param search the smm_search to query; NULL reports SMM_ERROR_NONE
+ * @param message buffer for the NUL-terminated human-readable description
+ *                (truncated to fit), or NULL to query only the code
+ * @param message_len size of @a message in bytes; ignored when message is NULL
+ * @return the machine-readable code of the last recorded error
  */
-smm_error smm_search_get_last_error (smm_search search);
+smm_error_code smm_search_get_last_error (smm_search search, char *message, size_t message_len);

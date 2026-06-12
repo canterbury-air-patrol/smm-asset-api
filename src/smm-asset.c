@@ -238,16 +238,25 @@ smm_asset_clear_error (smm_asset asset)
     pthread_mutex_unlock (&asset->lock);
 }
 
-smm_error
-smm_asset_get_last_error (smm_asset asset)
+smm_error_code
+smm_asset_get_last_error (smm_asset asset, char *message, size_t message_len)
 {
-    smm_error result = { SMM_ERROR_NONE, { 0 } };
+    if (message != NULL && message_len > 0)
+    {
+        message[0] = '\0';
+    }
     if (asset == NULL)
-        return result;
+    {
+        return SMM_ERROR_NONE;
+    }
     pthread_mutex_lock (&asset->lock);
-    result = asset->last_error;
+    smm_error_code code = asset->last_error.code;
+    if (message != NULL && message_len > 0)
+    {
+        snprintf (message, message_len, "%s", asset->last_error.message);
+    }
     pthread_mutex_unlock (&asset->lock);
-    return result;
+    return code;
 }
 
 static void
@@ -271,13 +280,22 @@ smm_search_clear_error (smm_search search)
     search->last_error.message[0] = '\0';
 }
 
-smm_error
-smm_search_get_last_error (smm_search search)
+smm_error_code
+smm_search_get_last_error (smm_search search, char *message, size_t message_len)
 {
-    smm_error result = { SMM_ERROR_NONE, { 0 } };
+    if (message != NULL && message_len > 0)
+    {
+        message[0] = '\0';
+    }
     if (search == NULL)
-        return result;
-    return search->last_error;
+    {
+        return SMM_ERROR_NONE;
+    }
+    if (message != NULL && message_len > 0)
+    {
+        snprintf (message, message_len, "%s", search->last_error.message);
+    }
+    return search->last_error.code;
 }
 
 void
@@ -309,18 +327,25 @@ smm_connection_clear_error (smm_connection conn)
     pthread_mutex_unlock (&conn->lock);
 }
 
-smm_error
-smm_connection_get_last_error (smm_connection connection)
+smm_error_code
+smm_connection_get_last_error (smm_connection connection, char *message, size_t message_len)
 {
-    smm_error result = { SMM_ERROR_NONE, { 0 } };
+    if (message != NULL && message_len > 0)
+    {
+        message[0] = '\0';
+    }
     if (connection == NULL)
     {
-        return result;
+        return SMM_ERROR_NONE;
     }
     pthread_mutex_lock (&connection->lock);
-    result = connection->last_error;
+    smm_error_code code = connection->last_error.code;
+    if (message != NULL && message_len > 0)
+    {
+        snprintf (message, message_len, "%s", connection->last_error.message);
+    }
     pthread_mutex_unlock (&connection->lock);
-    return result;
+    return code;
 }
 
 void
