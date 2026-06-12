@@ -97,6 +97,18 @@ smm_asprintf_c_locale (char **strp, const char *fmt, ...)
     return n;
 }
 
+const char *
+smm_asset_version_string (void)
+{
+    return SMM_VERSION_STRING;
+}
+
+unsigned int
+smm_asset_version_number (void)
+{
+    return SMM_VERSION_NUMBER;
+}
+
 void
 smm_asset_debugging_set (bool debug)
 {
