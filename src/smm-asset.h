@@ -170,7 +170,7 @@ const char *smm_asset_version_string (void);
  * @return the version in @ref SMM_VERSION_NUMBER format:
  *         (major << 16) | (minor << 8) | patch
  */
-unsigned int smm_asset_version_number (void);
+uint32_t smm_asset_version_number (void);
 
 /**
  * Enable/disable the debugging

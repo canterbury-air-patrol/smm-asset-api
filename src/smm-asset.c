@@ -103,7 +103,7 @@ smm_asset_version_string (void)
     return SMM_VERSION_STRING;
 }
 
-unsigned int
+uint32_t
 smm_asset_version_number (void)
 {
     return SMM_VERSION_NUMBER;
