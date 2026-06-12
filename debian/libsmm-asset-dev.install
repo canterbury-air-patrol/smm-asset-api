@@ -1,0 +1,3 @@
+usr/include/smm-asset.h
+usr/lib/*/libsmmasset.so
+usr/lib/*/pkgconfig/smm-asset.pc

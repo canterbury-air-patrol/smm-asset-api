@@ -6,10 +6,35 @@ Build-Depends: debhelper-compat (= 13), pkg-config, libtidy-dev, libcurl4-openss
 Standards-Version: 4.7.0
 Homepage: https://github.com/canterbury-air-patrol/smm-asset-api
 
-Package: libsmm-asset
+Package: libsmmasset0
 Section: libs
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: Asset Library for Search Management Map
+Breaks: libsmm-asset (<< 1.0.0)
+Replaces: libsmm-asset (<< 1.0.0)
+Description: Asset Library for Search Management Map - runtime
+ C library for acting as an asset (search aircraft, boat, or ground
+ party) against a Search Management Map server: reporting positions,
+ receiving commands, and accepting and completing searches.
+ .
+ This package contains the shared library.
+
+Package: libsmm-asset-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libsmmasset0 (= ${binary:Version}), ${misc:Depends},
+ libtidy-dev, libjansson-dev, libcurl4-openssl-dev | libcurl4-gnutls-dev
+Breaks: libsmm-asset (<< 1.0.0)
+Replaces: libsmm-asset (<< 1.0.0)
+Description: Asset Library for Search Management Map - development files
+ C library for acting as an asset (search aircraft, boat, or ground
+ party) against a Search Management Map server: reporting positions,
+ receiving commands, and accepting and completing searches.
+ .
+ This package contains the header, the development symlink, and the
+ pkg-config file. The libcurl/jansson/tidy development packages are
+ dependencies because smm-asset.pc references them via Requires.private,
+ which pkg-config resolves even for dynamic linking.
