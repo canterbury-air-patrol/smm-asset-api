@@ -186,7 +186,7 @@ void smm_asset_debugging_set (bool debug);
  * @param user the username to authenticate as
  * @param pass the password to authenticate with
  *
- * @return an smm_connection object, check the status with @ref smm_asset_connection_status
+ * @return an smm_connection object, check the status with @ref smm_asset_connection_get_state
  */
 smm_connection smm_asset_connect (const char *host, const char *user, const char *pass);
 
