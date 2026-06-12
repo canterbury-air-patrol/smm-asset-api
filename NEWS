@@ -4,13 +4,32 @@ libsmm-asset 1.0.0
 First stable release.
 
  * Structured error reporting: smm_connection_get_last_error(),
-   smm_asset_get_last_error(), smm_search_get_last_error() and the smm_error
-   type with machine-readable smm_error_code values.
+   smm_asset_get_last_error() and smm_search_get_last_error() return a
+   machine-readable smm_error_code and copy a human-readable message into a
+   caller-supplied buffer.  Errors are recorded per connection, per asset
+   and per search, so concurrent operations do not clobber each other's
+   error state.
+ * Explicit authentication with smm_asset_connection_login(); otherwise
+   login happens lazily on the first request, which the new
+   SMM_CONNECTION_NEW connection state reports.
+ * Runtime version queries smm_asset_version_string() and
+   smm_asset_version_number(), plus the SMM_VERSION_NUMBER macro for
+   compile-time comparisons.
  * Thread-safe connection sharing backed by reference counting, so assets and
    searches may outlive smm_connection_close().
  * Hardened HTTP handling: TLS verification enabled by default, connect and
-   transfer timeouts on every request, validated redirects, same-host-only
-   HTTP->HTTPS upgrades, and rejection of unsafe server-supplied paths.
+   transfer timeouts on every request, validated redirects with
+   same-host-only HTTP->HTTPS upgrades (including during eager login),
+   redirect bodies discarded between retries, buffered response sizes
+   capped, rejection of unsafe server-supplied paths, and passwords never
+   written to debug output.
+ * Transient HTTP errors (e.g. a 404 or 500 from one endpoint) no longer
+   mark a connected session as failed.
  * Coordinates are formatted locale-independently in request URLs.
+ * Host URIs tolerate trailing slashes and may carry a base path
+   (e.g. https://example.com/smm/).
+ * pkg-config file usable from non-default install prefixes.
+ * Public API integer types are fixed-width (int32_t altitude, uint16_t
+   heading, uint8_t fix, uint32_t version number, uint64_t search metrics).
  * Stable, versioned ABI (SONAME libsmmasset.so.0) that exports only the
    documented public API.
