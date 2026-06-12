@@ -170,7 +170,8 @@ smm_asset smm_asset_create (smm_connection connection, const char *name, const c
                             long long asset_type_id);
 void smm_asset_free_asset (smm_asset assets);
 
-char *smm_asset_build_position_url (long long asset_id, double lat, double lon, int alt, uint16_t heading, uint8_t fix);
+char *smm_asset_build_position_url (long long asset_id, double lat, double lon, int32_t alt, uint16_t heading,
+                                    uint8_t fix);
 
 void smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len);
 

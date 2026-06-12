@@ -1323,6 +1323,21 @@ START_TEST (test_build_position_url_negative_altitude)
 }
 END_TEST
 
+START_TEST (test_build_position_url_altitude_int32_range)
+{
+    /* The altitude parameter is int32_t; the full range must format intact. */
+    char *url = smm_asset_build_position_url (7, -43.5, 172.6, INT32_MIN, 270, 3);
+    ck_assert_ptr_nonnull (url);
+    ck_assert_ptr_nonnull (strstr (url, "alt=-2147483648"));
+    free (url);
+
+    url = smm_asset_build_position_url (7, -43.5, 172.6, INT32_MAX, 270, 3);
+    ck_assert_ptr_nonnull (url);
+    ck_assert_ptr_nonnull (strstr (url, "alt=2147483647"));
+    free (url);
+}
+END_TEST
+
 START_TEST (test_build_position_url_heading_boundary)
 {
     char *url0 = smm_asset_build_position_url (1, 0.0, 0.0, 0, 0, 0);
@@ -1648,6 +1663,7 @@ smm_suite (void)
     TCase *tc_position_ext = tcase_create ("PositionExt");
     tcase_add_test (tc_position_ext, test_build_position_url_values);
     tcase_add_test (tc_position_ext, test_build_position_url_negative_altitude);
+    tcase_add_test (tc_position_ext, test_build_position_url_altitude_int32_range);
     tcase_add_test (tc_position_ext, test_build_position_url_heading_boundary);
     tcase_add_test (tc_position_ext, test_asset_last_goto_pos_not_goto);
     tcase_add_test (tc_position_ext, test_asset_last_goto_pos_goto);
