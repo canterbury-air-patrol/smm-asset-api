@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install Deps
       run: sudo apt update && sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev check locales-all
     - name: autogen
@@ -33,7 +33,7 @@ jobs:
   static-analysis:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install Deps
       run: |
         sudo apt update
