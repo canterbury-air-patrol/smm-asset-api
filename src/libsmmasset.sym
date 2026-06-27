@@ -1,6 +1,7 @@
 smm_asset_connect
 smm_asset_connection_get_state
 smm_asset_connection_login
+smm_asset_connection_timeouts_set
 smm_asset_connection_tls_verify_set
 smm_asset_debugging_set
 smm_asset_free_assets

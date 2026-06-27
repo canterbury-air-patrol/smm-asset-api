@@ -79,6 +79,10 @@ struct smm_connection_s
     char *csrfmiddlewaretoken;
     pthread_mutex_t lock;
     bool verify_tls;
+    /* Per-connection libcurl timeouts in seconds; 0 means use the
+     * SMM_CURL_*_TIMEOUT_SECS defaults. Guarded by lock. */
+    long connect_timeout_secs;
+    long transfer_timeout_secs;
     int refcount;
     bool login_in_progress;
     pthread_cond_t login_cond;

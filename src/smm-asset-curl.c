@@ -251,6 +251,8 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     struct smm_curl_res_s *res = NULL;
     CURL *curl = NULL;
     bool verify_tls = true;
+    long connect_timeout = 0;
+    long transfer_timeout = 0;
     CURLSH *share = NULL;
     struct curl_slist *headers = NULL;
     bool have_ref = false;
@@ -273,6 +275,8 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 
     pthread_mutex_lock (&conn->lock);
     verify_tls = conn->verify_tls;
+    connect_timeout = conn->connect_timeout_secs;
+    transfer_timeout = conn->transfer_timeout_secs;
     share = conn->share;
     conn->refcount++;
     have_ref = true;
@@ -297,8 +301,9 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, verify_tls ? 2L : 0L);
     curl_easy_setopt (curl, CURLOPT_COOKIEFILE, "");
     curl_easy_setopt (curl, CURLOPT_FOLLOWLOCATION, 0L);
-    curl_easy_setopt (curl, CURLOPT_CONNECTTIMEOUT, SMM_CURL_CONNECT_TIMEOUT_SECS);
-    curl_easy_setopt (curl, CURLOPT_TIMEOUT, SMM_CURL_TRANSFER_TIMEOUT_SECS);
+    curl_easy_setopt (curl, CURLOPT_CONNECTTIMEOUT,
+                      connect_timeout > 0 ? connect_timeout : SMM_CURL_CONNECT_TIMEOUT_SECS);
+    curl_easy_setopt (curl, CURLOPT_TIMEOUT, transfer_timeout > 0 ? transfer_timeout : SMM_CURL_TRANSFER_TIMEOUT_SECS);
     curl_easy_setopt (curl, CURLOPT_URL, res->full_uri);
 
     if (post_data)
