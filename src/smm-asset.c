@@ -437,12 +437,21 @@ smm_asset_create (smm_connection conn, const char *name, const char *type, long 
         return NULL;
     }
 
-    asset->conn = conn;
-    smm_connection_ref (conn);
+    /* Duplicate the strings and initialise the mutex before taking the
+     * connection reference, so any failure here frees only the asset: there is
+     * no reference or initialised mutex to unwind. The connection reference is
+     * taken last, after every fallible step, so no failure path can leak it. */
     asset->name = name ? strdup (name) : NULL;
     asset->type = type ? strdup (type) : NULL;
-
     if ((name && !asset->name) || (type && !asset->type))
+    {
+        free (asset->name);
+        free (asset->type);
+        free (asset);
+        return NULL;
+    }
+
+    if (pthread_mutex_init (&asset->lock, NULL) != 0)
     {
         free (asset->name);
         free (asset->type);
@@ -452,8 +461,8 @@ smm_asset_create (smm_connection conn, const char *name, const char *type, long 
 
     asset->asset_id = asset_id;
     asset->asset_type_id = asset_type_id;
-
-    pthread_mutex_init (&asset->lock, NULL);
+    asset->conn = conn;
+    smm_connection_ref (conn);
 
     return asset;
 }
@@ -595,6 +604,11 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
     bool parse_res = smm_parse_assets (connection, buf.data, buf.bytes, assets, assets_count);
     if (!parse_res)
     {
+        /* False positive: the analyzer sees smm_parse_assets's realloc-failure
+         * cleanup unref an asset's connection and assumes that frees
+         * 'connection', but the caller owns a reference for the duration of
+         * this call, so it cannot be freed here. */
+        /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc) */
         smm_connection_set_error (connection, SMM_ERROR_PARSE, "failed to parse /assets/ response");
     }
 

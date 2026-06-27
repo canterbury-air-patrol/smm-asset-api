@@ -466,6 +466,22 @@ START_TEST (test_asset_outlives_connection)
 }
 END_TEST
 
+START_TEST (test_asset_create_balances_connection_ref)
+{
+    /* smm_asset_create takes one connection reference and smm_asset_free_asset
+     * drops it; the count must return to where it started. */
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    int before = conn->refcount;
+    smm_asset asset = smm_asset_create (conn, "name", "type", 1, 2);
+    ck_assert_ptr_nonnull (asset);
+    ck_assert_int_eq (conn->refcount, before + 1);
+    smm_asset_free_asset (asset);
+    ck_assert_int_eq (conn->refcount, before);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_report_position_null_conn)
 {
     smm_asset asset = smm_asset_create (NULL, "A", "T", 1, 1);
@@ -1713,6 +1729,7 @@ smm_suite (void)
     tcase_add_test (tc_search, test_search_complete_null_search);
     tcase_add_test (tc_search, test_search_get_waypoints_null_search);
     tcase_add_test (tc_search, test_asset_outlives_connection);
+    tcase_add_test (tc_search, test_asset_create_balances_connection_ref);
     tcase_add_test (tc_search, test_search_sweep_width);
     tcase_add_test (tc_search, test_search_distance_and_length);
     tcase_add_test (tc_search, test_get_search_absolute_url_ignored);
