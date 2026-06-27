@@ -7,6 +7,11 @@ services:
       - DB_PASS=smmpass
       - DB_NAME=smm
       - DEBUG=True
+      # The integration test and the healthcheck talk to SMM over plain HTTP on
+      # :8080. Recent images default SECURE_SSL_REDIRECT on (gated by SECURE_SSL),
+      # which 301-redirects every request to https://...:8080 where nothing is
+      # listening for TLS, so the healthcheck and the test both fail. Disable it.
+      - SECURE_SSL=False
       - SECRET_KEY=test-secret-key
       - ALLOWED_HOSTS=localhost,smm
     depends_on:
