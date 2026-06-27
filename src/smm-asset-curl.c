@@ -176,7 +176,10 @@ eat_data (char *ptr __attribute__ ((unused)), size_t size, size_t nmemb, void *u
 
 /* Signature is fixed by libcurl's curl_write_callback; ptr cannot be const. */
 size_t
-/* cppcheck-suppress[constParameterPointer] */
+/* cppcheck reports this as constParameterPointer or constParameterCallback
+ * depending on its version (CI's cppcheck and a current local one disagree);
+ * suppress both so the gate is reproducible across versions. */
+/* cppcheck-suppress[constParameterPointer,constParameterCallback] */
 to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 {
     size_t new_bytes;
