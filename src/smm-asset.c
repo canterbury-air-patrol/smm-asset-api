@@ -693,21 +693,34 @@ smm_parse_command (const char *data, size_t len, smm_asset_command *command, dou
                 res = true;
                 if (strcmp (cmd_str, "GOTO") == 0)
                 {
-                    /* Get lat and long as well. Accept any
-                     * JSON number (real or integer); the
-                     * server normally emits floats but the
-                     * contract does not guarantee it. */
-                    tmp = json_object_get (json_root, "latitude");
-                    if (json_is_number (tmp))
+                    /* A GOTO is only valid with both coordinates present,
+                     * numeric, and in range. Accept any JSON number (real or
+                     * integer); the server normally emits floats but the
+                     * contract does not guarantee it. A malformed GOTO is
+                     * rejected (res false, command left UNKNOWN) so a partial
+                     * parse can never expose stale coordinates via
+                     * smm_asset_last_goto_pos. */
+                    json_t *json_lat = json_object_get (json_root, "latitude");
+                    json_t *json_lon = json_object_get (json_root, "longitude");
+                    if (json_is_number (json_lat) && json_is_number (json_lon))
                     {
-                        *lat = json_number_value (tmp);
+                        double lat_value = json_number_value (json_lat);
+                        double lon_value = json_number_value (json_lon);
+                        if (lat_value >= -90.0 && lat_value <= 90.0 && lon_value >= -180.0 && lon_value <= 180.0)
+                        {
+                            *lat = lat_value;
+                            *lon = lon_value;
+                            *command = SMM_COMMAND_GOTO;
+                        }
+                        else
+                        {
+                            res = false;
+                        }
                     }
-                    tmp = json_object_get (json_root, "longitude");
-                    if (json_is_number (tmp))
+                    else
                     {
-                        *lon = json_number_value (tmp);
+                        res = false;
                     }
-                    *command = SMM_COMMAND_GOTO;
                 }
                 else if (strcmp (cmd_str, "RON") == 0)
                 {
@@ -746,13 +759,25 @@ smm_parse_command (const char *data, size_t len, smm_asset_command *command, dou
     return res;
 }
 
-static bool
+bool
 smm_asset_update_command (smm_asset asset, const struct buffer_s *buf)
 {
-    bool res;
+    /* Parse into locals first, then commit under the lock. Coordinates are
+     * only published for a valid GOTO, so a malformed GOTO (command left
+     * UNKNOWN by smm_parse_command) cannot leave stale coordinates visible
+     * through smm_asset_last_goto_pos. */
+    smm_asset_command command = SMM_COMMAND_UNKNOWN;
+    double lat = 0.0;
+    double lon = 0.0;
+    bool res = smm_parse_command (buf->data, buf->bytes, &command, &lat, &lon);
+
     pthread_mutex_lock (&asset->lock);
-    res = smm_parse_command (buf->data, buf->bytes, &asset->last_command, &asset->last_command_lat,
-                             &asset->last_command_lon);
+    asset->last_command = command;
+    if (command == SMM_COMMAND_GOTO)
+    {
+        asset->last_command_lat = lat;
+        asset->last_command_lon = lon;
+    }
     pthread_mutex_unlock (&asset->lock);
     return res;
 }
