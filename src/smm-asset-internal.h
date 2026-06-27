@@ -172,6 +172,9 @@ char *smm_parse_csrf_token (const char *data, size_t len);
 bool smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_assets *assets,
                        size_t *assets_count);
 bool smm_parse_command (const char *data, size_t len, smm_asset_command *command, double *lat, double *lon);
+/* Parse a command response and commit it to the asset under its lock.
+ * Coordinates are published only for a valid GOTO. Exposed for testing. */
+bool smm_asset_update_command (smm_asset asset, const struct buffer_s *buf);
 bool smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, size_t *waypoints_count);
 
 smm_asset smm_asset_create (smm_connection connection, const char *name, const char *type, long long asset_id,

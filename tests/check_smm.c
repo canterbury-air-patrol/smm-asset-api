@@ -342,6 +342,94 @@ START_TEST (test_command_parsing_unknown)
 }
 END_TEST
 
+START_TEST (test_command_parsing_goto_missing_latitude)
+{
+    const char *json = "{\"action\": \"GOTO\", \"longitude\": 172.6}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+
+    ck_assert_uint_eq (res, false);
+    ck_assert_int_ne (cmd, SMM_COMMAND_GOTO);
+}
+END_TEST
+
+START_TEST (test_command_parsing_goto_missing_longitude)
+{
+    const char *json = "{\"action\": \"GOTO\", \"latitude\": -43.5}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+
+    ck_assert_uint_eq (res, false);
+    ck_assert_int_ne (cmd, SMM_COMMAND_GOTO);
+}
+END_TEST
+
+START_TEST (test_command_parsing_goto_nonnumeric)
+{
+    const char *json = "{\"action\": \"GOTO\", \"latitude\": \"x\", \"longitude\": \"y\"}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+
+    ck_assert_uint_eq (res, false);
+    ck_assert_int_ne (cmd, SMM_COMMAND_GOTO);
+}
+END_TEST
+
+START_TEST (test_command_parsing_goto_out_of_range_lat)
+{
+    const char *json = "{\"action\": \"GOTO\", \"latitude\": 91.0, \"longitude\": 172.6}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+
+    ck_assert_uint_eq (res, false);
+    ck_assert_int_ne (cmd, SMM_COMMAND_GOTO);
+}
+END_TEST
+
+START_TEST (test_command_parsing_goto_out_of_range_lon)
+{
+    const char *json = "{\"action\": \"GOTO\", \"latitude\": -43.5, \"longitude\": 181.0}";
+    smm_asset_command cmd;
+    double lat = 0, lon = 0;
+    bool res = smm_parse_command (json, strlen (json), &cmd, &lat, &lon);
+
+    ck_assert_uint_eq (res, false);
+    ck_assert_int_ne (cmd, SMM_COMMAND_GOTO);
+}
+END_TEST
+
+START_TEST (test_goto_then_malformed_goto_clears_position)
+{
+    /* A valid GOTO publishes a position; a following malformed GOTO must not
+     * keep reporting the stale coordinates. */
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+    double lat = 0, lon = 0;
+
+    char good[] = "{\"action\": \"GOTO\", \"latitude\": -43.5, \"longitude\": 172.6}";
+    struct buffer_s gbuf = { good, strlen (good) };
+    smm_asset_update_command (asset, &gbuf);
+    ck_assert_int_eq (smm_asset_last_goto_pos (asset, &lat, &lon), true);
+    ck_assert_ldouble_eq_tol (lat, -43.5, 0.0001);
+    ck_assert_ldouble_eq_tol (lon, 172.6, 0.0001);
+
+    char bad[] = "{\"action\": \"GOTO\", \"longitude\": 172.6}"; /* missing latitude */
+    struct buffer_s bbuf = { bad, strlen (bad) };
+    smm_asset_update_command (asset, &bbuf);
+    ck_assert_int_eq (smm_asset_last_goto_pos (asset, &lat, &lon), false);
+    ck_assert_int_eq (smm_asset_last_command (asset), SMM_COMMAND_UNKNOWN);
+
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_waypoint_parsing)
 {
     const char *json = "{\"features\": [{\"geometry\": {\"coordinates\": [[172.6, -43.5], [172.7, -43.6]]}}]}";
@@ -1774,6 +1862,11 @@ smm_suite (void)
     tcase_add_test (tc_commands, test_command_parsing_mission_complete);
     tcase_add_test (tc_commands, test_command_parsing_continue);
     tcase_add_test (tc_commands, test_command_parsing_unknown);
+    tcase_add_test (tc_commands, test_command_parsing_goto_missing_latitude);
+    tcase_add_test (tc_commands, test_command_parsing_goto_missing_longitude);
+    tcase_add_test (tc_commands, test_command_parsing_goto_nonnumeric);
+    tcase_add_test (tc_commands, test_command_parsing_goto_out_of_range_lat);
+    tcase_add_test (tc_commands, test_command_parsing_goto_out_of_range_lon);
     tcase_add_test (tc_commands, test_command_parsing_no_action_field);
     suite_add_tcase (s, tc_commands);
 
@@ -1842,6 +1935,7 @@ smm_suite (void)
     tcase_add_test (tc_position_ext, test_build_position_url_heading_boundary);
     tcase_add_test (tc_position_ext, test_asset_last_goto_pos_not_goto);
     tcase_add_test (tc_position_ext, test_asset_last_goto_pos_goto);
+    tcase_add_test (tc_position_ext, test_goto_then_malformed_goto_clears_position);
     suite_add_tcase (s, tc_position_ext);
 
     return s;
