@@ -1393,6 +1393,15 @@ START_TEST (test_connection_login_fields_initialised)
 }
 END_TEST
 
+START_TEST (test_curl_global_init_succeeds)
+{
+    /* The wrapper initialises libcurl's global state once and is safe to call
+     * repeatedly; both calls must report success. */
+    ck_assert_int_eq (smm_curl_global_init (), true);
+    ck_assert_int_eq (smm_curl_global_init (), true);
+}
+END_TEST
+
 START_TEST (test_connection_timeouts_default_unset)
 {
     /* A fresh connection carries no timeout override (0 == use the defaults). */
@@ -1570,6 +1579,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_connect_null_user);
     tcase_add_test (tc_conn, test_connect_null_pass);
     tcase_add_test (tc_conn, test_connection_login_fields_initialised);
+    tcase_add_test (tc_conn, test_curl_global_init_succeeds);
     tcase_add_test (tc_conn, test_connection_timeouts_default_unset);
     tcase_add_test (tc_conn, test_connection_timeouts_set_stores);
     tcase_add_test (tc_conn, test_connection_timeouts_set_null_safe);

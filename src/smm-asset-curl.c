@@ -39,6 +39,27 @@
 #error No tidy header(s)
 #endif
 
+static pthread_once_t smm_curl_global_once = PTHREAD_ONCE_INIT;
+static CURLcode smm_curl_global_result = CURLE_OK;
+
+static void
+smm_curl_global_init_once (void)
+{
+    smm_curl_global_result = curl_global_init (CURL_GLOBAL_DEFAULT);
+}
+
+/* Initialise libcurl's global state exactly once before any other libcurl API
+ * is used. Thread-safe via pthread_once; returns true on success. There is
+ * deliberately no matching curl_global_cleanup(): as a shared library we cannot
+ * know when the host application is finished with libcurl, and tearing the
+ * global state down underneath it would be unsafe. */
+bool
+smm_curl_global_init (void)
+{
+    pthread_once (&smm_curl_global_once, smm_curl_global_init_once);
+    return smm_curl_global_result == CURLE_OK;
+}
+
 static void
 smm_curl_lock (CURL *handle, curl_lock_data data, curl_lock_access access, void *userptr)
 {

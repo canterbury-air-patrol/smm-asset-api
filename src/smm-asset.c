@@ -161,6 +161,17 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
     pthread_mutex_init (&conn->lock, NULL);
     conn->login_in_progress = false;
     pthread_cond_init (&conn->login_cond, NULL);
+
+    /* libcurl's global state must be initialised before any other libcurl call
+     * (curl_share_init and curl_url below, and every request on this
+     * connection). Do it here, the single chokepoint through which every
+     * libcurl-using path is reached. */
+    if (!smm_curl_global_init ())
+    {
+        conn->state = SMM_CONNECTION_FAILURE;
+        return conn;
+    }
+
     if (!smm_connection_share_init (conn))
     {
         smm_connection_unref (conn);
