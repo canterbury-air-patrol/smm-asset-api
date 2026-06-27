@@ -754,6 +754,17 @@ START_TEST (test_to_buffer_rejects_when_full)
 }
 END_TEST
 
+START_TEST (test_to_buffer_rejects_size_overflow)
+{
+    /* size * nmemb would overflow size_t; the callback must refuse the chunk
+     * rather than wrap to a small length that defeats the cap check. */
+    struct buffer_s buf = { NULL, 0 };
+    char chunk[] = "x";
+    ck_assert_uint_eq (to_buffer (chunk, SIZE_MAX, 2, &buf), 0);
+    ck_assert_ptr_null (buf.data);
+}
+END_TEST
+
 START_TEST (test_buffer_reset_discards_content)
 {
     /* The retry loop resets the buffer between attempts so a redirect body
@@ -1648,6 +1659,7 @@ smm_suite (void)
     tcase_add_test (tc_buffer, test_to_buffer_accumulates);
     tcase_add_test (tc_buffer, test_to_buffer_rejects_oversized_chunk);
     tcase_add_test (tc_buffer, test_to_buffer_rejects_when_full);
+    tcase_add_test (tc_buffer, test_to_buffer_rejects_size_overflow);
     tcase_add_test (tc_buffer, test_buffer_reset_discards_content);
     tcase_add_test (tc_buffer, test_buffer_reset_null_safe);
     suite_add_tcase (s, tc_buffer);

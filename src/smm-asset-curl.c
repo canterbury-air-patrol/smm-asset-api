@@ -25,6 +25,7 @@
 #include "smm-asset.h"
 
 #include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -146,12 +147,31 @@ smm_curl_res_free (struct smm_curl_res_s *res)
     }
 }
 
+/* Compute size*nmemb for a libcurl write callback, guarding against size_t
+ * overflow. Returns false (leaving *out untouched) when the product would
+ * overflow, so the caller can abort the transfer by returning 0. libcurl
+ * normally passes bounded chunks, but the arithmetic must be correct at the
+ * boundary so a wrapped length cannot defeat later size checks. */
+static bool
+smm_curl_chunk_size (size_t size, size_t nmemb, size_t *out)
+{
+    if (size != 0 && nmemb > SIZE_MAX / size)
+        return false;
+    *out = size * nmemb;
+    return true;
+}
+
 /* Signature is fixed by libcurl's curl_write_callback; params cannot be const. */
 static size_t
 /* cppcheck-suppress[constParameterCallback] */
 eat_data (char *ptr __attribute__ ((unused)), size_t size, size_t nmemb, void *userdata __attribute__ ((unused)))
 {
-    return size * nmemb;
+    size_t total;
+    if (!smm_curl_chunk_size (size, nmemb, &total))
+    {
+        return 0;
+    }
+    return total;
 }
 
 /* Signature is fixed by libcurl's curl_write_callback; ptr cannot be const. */
@@ -159,7 +179,11 @@ size_t
 /* cppcheck-suppress[constParameterPointer] */
 to_buffer (char *ptr, size_t size, size_t nmemb, void *userdata)
 {
-    size_t new_bytes = size * nmemb;
+    size_t new_bytes;
+    if (!smm_curl_chunk_size (size, nmemb, &new_bytes))
+    {
+        return 0;
+    }
     struct buffer_s *buf = (struct buffer_s *)userdata;
     /* Refuse to grow the buffer past the cap. Returning a short count makes
      * curl fail the transfer with CURLE_WRITE_ERROR. The comparison is written
@@ -383,8 +407,13 @@ out:
 static size_t
 populate_tidy (char *ptr, size_t size, size_t nmemb, void *userdata)
 {
-    tidyBufAppend ((TidyBuffer *)userdata, ptr, size * nmemb);
-    return size * nmemb;
+    size_t total;
+    if (!smm_curl_chunk_size (size, nmemb, &total))
+    {
+        return 0;
+    }
+    tidyBufAppend ((TidyBuffer *)userdata, ptr, total);
+    return total;
 }
 
 /* Bound on how deeply extract_csrfmiddlewaretoken recurses into the parsed
