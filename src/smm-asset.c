@@ -188,8 +188,18 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
         }
         else
         {
-            /* Host looks valid; login happens lazily on the first request. */
-            conn->state = SMM_CONNECTION_NEW;
+            /* Parse succeeded, but libcurl accepts schemes this library cannot
+             * use as an SMM host (ftp, file, ...). Accept only http(s) with a
+             * non-empty host; login still happens lazily on the first request.
+             * libcurl lowercases the scheme, so a plain strcmp is sufficient. */
+            char *scheme = NULL;
+            char *chost = NULL;
+            bool http_ok = curl_url_get (curlu, CURLUPART_SCHEME, &scheme, 0) == CURLUE_OK && scheme
+                           && (strcmp (scheme, "http") == 0 || strcmp (scheme, "https") == 0)
+                           && curl_url_get (curlu, CURLUPART_HOST, &chost, 0) == CURLUE_OK && chost && chost[0] != '\0';
+            conn->state = http_ok ? SMM_CONNECTION_NEW : SMM_CONNECTION_HOST_INVALID;
+            curl_free (scheme);
+            curl_free (chost);
         }
         curl_url_cleanup (curlu);
     }
