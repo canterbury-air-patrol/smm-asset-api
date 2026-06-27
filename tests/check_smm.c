@@ -202,6 +202,66 @@ START_TEST (test_assets_parsing_drops_only_invalid)
 }
 END_TEST
 
+START_TEST (test_assets_parsing_zero_id)
+{
+    /* id 0 is not a valid server primary key; the asset is dropped. */
+    const char *json = "{\"assets\": [{\"id\": 0, \"type_id\": 2, \"name\": \"Asset 1\", \"type_name\": \"Type 1\"}]}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets (NULL, json, strlen (json), &assets, &count);
+
+    ck_assert_uint_eq (res, true);
+    ck_assert_uint_eq (count, 0);
+    ck_assert_ptr_null (assets);
+}
+END_TEST
+
+START_TEST (test_assets_parsing_negative_id)
+{
+    /* A negative id would build paths like /data/assets/-1/; reject it. */
+    const char *json = "{\"assets\": [{\"id\": -1, \"type_id\": 2, \"name\": \"Asset 1\", \"type_name\": \"Type 1\"}]}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets (NULL, json, strlen (json), &assets, &count);
+
+    ck_assert_uint_eq (res, true);
+    ck_assert_uint_eq (count, 0);
+    ck_assert_ptr_null (assets);
+}
+END_TEST
+
+START_TEST (test_assets_parsing_negative_type_id)
+{
+    /* type_id is optional; a negative value is left at the sentinel and does
+     * not drop an otherwise valid asset. */
+    const char *json = "{\"assets\": [{\"id\": 1, \"type_id\": -2, \"name\": \"Asset 1\", \"type_name\": \"Type 1\"}]}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets (NULL, json, strlen (json), &assets, &count);
+
+    ck_assert_uint_eq (res, true);
+    ck_assert_uint_eq (count, 1);
+    ck_assert_str_eq (smm_asset_name (assets[0]), "Asset 1");
+    smm_asset_free_assets (assets, count);
+}
+END_TEST
+
+START_TEST (test_assets_parsing_zero_id_drops_only_invalid)
+{
+    /* A valid asset is kept even when a sibling entry has a non-positive id. */
+    const char *json = "{\"assets\": [{\"id\": 0, \"name\": \"Bad\"}, {\"id\": 7, \"type_id\": 2, \"name\": \"Good\", "
+                       "\"type_name\": \"Type 1\"}]}";
+    smm_assets assets;
+    size_t count;
+    bool res = smm_parse_assets (NULL, json, strlen (json), &assets, &count);
+
+    ck_assert_uint_eq (res, true);
+    ck_assert_uint_eq (count, 1);
+    ck_assert_str_eq (smm_asset_name (assets[0]), "Good");
+    smm_asset_free_assets (assets, count);
+}
+END_TEST
+
 START_TEST (test_command_parsing_goto)
 {
     const char *json = "{\"action\": \"GOTO\", \"latitude\": -43.5, \"longitude\": 172.6}";
@@ -1696,6 +1756,10 @@ smm_suite (void)
     tcase_add_test (tc_assets, test_assets_parsing_noninteger_id);
     tcase_add_test (tc_assets, test_assets_parsing_noninteger_type_id);
     tcase_add_test (tc_assets, test_assets_parsing_drops_only_invalid);
+    tcase_add_test (tc_assets, test_assets_parsing_zero_id);
+    tcase_add_test (tc_assets, test_assets_parsing_negative_id);
+    tcase_add_test (tc_assets, test_assets_parsing_negative_type_id);
+    tcase_add_test (tc_assets, test_assets_parsing_zero_id_drops_only_invalid);
     tcase_add_test (tc_assets, test_assets_parsing_missing_type_id);
     suite_add_tcase (s, tc_assets);
 

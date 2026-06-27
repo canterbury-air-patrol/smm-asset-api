@@ -499,21 +499,35 @@ smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_a
                 {
                     if (strcmp (key, "id") == 0)
                     {
+                        /* Require a positive integer: the id is a server primary
+                         * key substituted into request URLs, so 0 and negative
+                         * values are rejected (have_id stays false, dropping the
+                         * asset) rather than driving requests at nonsensical
+                         * paths such as /data/assets/-1/. */
                         if (json_is_integer (val))
                         {
-                            asset_id = json_integer_value (val);
-                            have_id = true;
+                            json_int_t id_value = json_integer_value (val);
+                            if (id_value > 0)
+                            {
+                                asset_id = id_value;
+                                have_id = true;
+                            }
                         }
                     }
                     else if (strcmp (key, "type_id") == 0)
                     {
-                        /* Validate as an integer, consistent with "id", so a
-                         * non-integer value is left as the -1 sentinel rather
-                         * than silently coerced to 0. type_id is optional, so
-                         * an absent or malformed one does not drop the asset. */
+                        /* Validate as a positive integer, consistent with "id",
+                         * so a non-integer or non-positive value is left as the
+                         * -1 sentinel rather than silently coerced. type_id is
+                         * optional, so an absent or malformed one does not drop
+                         * the asset. */
                         if (json_is_integer (val))
                         {
-                            asset_type_id = json_integer_value (val);
+                            json_int_t type_id_value = json_integer_value (val);
+                            if (type_id_value > 0)
+                            {
+                                asset_type_id = type_id_value;
+                            }
                         }
                     }
                     else if (strcmp (key, "name") == 0)
@@ -527,8 +541,8 @@ smm_parse_assets (smm_connection connection, const char *data, size_t len, smm_a
                 }
                 /* The id is required: it is substituted into request URLs
                  * (position reports, search lookups). Drop any asset that
-                 * lacks a valid integer id rather than issuing requests
-                 * against a sentinel id of -1. */
+                 * lacks a valid positive integer id rather than issuing
+                 * requests against a sentinel id of -1. */
                 if (!have_id)
                 {
                     DEBUG ("asset entry has no valid integer id; skipping\n");
