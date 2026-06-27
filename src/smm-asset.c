@@ -214,6 +214,18 @@ smm_asset_connection_tls_verify_set (smm_connection connection, bool verify)
     }
 }
 
+void
+smm_asset_connection_timeouts_set (smm_connection connection, long connect_secs, long transfer_secs)
+{
+    if (connection != NULL)
+    {
+        pthread_mutex_lock (&connection->lock);
+        connection->connect_timeout_secs = connect_secs;
+        connection->transfer_timeout_secs = transfer_secs;
+        pthread_mutex_unlock (&connection->lock);
+    }
+}
+
 static void
 smm_asset_set_error (smm_asset asset, smm_error_code code, const char *fmt, ...)
 {

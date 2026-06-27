@@ -241,6 +241,22 @@ bool smm_asset_connection_login (smm_connection connection);
 void smm_asset_connection_tls_verify_set (smm_connection connection, bool verify);
 
 /**
+ * Override the connect and transfer timeouts for this connection.
+ *
+ * Applies to every subsequent request made on the connection. A non-positive
+ * value for either argument keeps the library default (30s connect, 60s
+ * transfer). The defaults suit general use; a latency-sensitive caller (e.g. a
+ * control loop that reports position roughly once a second) can set an
+ * aggressive bound so a single slow or hung endpoint cannot block a call for
+ * the full TCP window.
+ *
+ * @param connection the smm_connection object; NULL is a no-op
+ * @param connect_secs connect timeout in seconds, or <= 0 to keep the default
+ * @param transfer_secs total transfer timeout in seconds, or <= 0 to keep the default
+ */
+void smm_asset_connection_timeouts_set (smm_connection connection, long connect_secs, long transfer_secs);
+
+/**
  * Close a connection to smm and free associated resources.
  *
  * This function should only be called when no other threads are actively

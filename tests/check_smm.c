@@ -1393,6 +1393,35 @@ START_TEST (test_connection_login_fields_initialised)
 }
 END_TEST
 
+START_TEST (test_connection_timeouts_default_unset)
+{
+    /* A fresh connection carries no timeout override (0 == use the defaults). */
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (conn->connect_timeout_secs, 0);
+    ck_assert_int_eq (conn->transfer_timeout_secs, 0);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connection_timeouts_set_stores)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset_connection_timeouts_set (conn, 5, 10);
+    ck_assert_int_eq (conn->connect_timeout_secs, 5);
+    ck_assert_int_eq (conn->transfer_timeout_secs, 10);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connection_timeouts_set_null_safe)
+{
+    /* Must not crash on a NULL connection. */
+    smm_asset_connection_timeouts_set (NULL, 5, 10);
+}
+END_TEST
+
 START_TEST (test_get_last_error_null_connection)
 {
     char msg[16] = "sentinel";
@@ -1541,6 +1570,9 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_connect_null_user);
     tcase_add_test (tc_conn, test_connect_null_pass);
     tcase_add_test (tc_conn, test_connection_login_fields_initialised);
+    tcase_add_test (tc_conn, test_connection_timeouts_default_unset);
+    tcase_add_test (tc_conn, test_connection_timeouts_set_stores);
+    tcase_add_test (tc_conn, test_connection_timeouts_set_null_safe);
     tcase_add_test (tc_conn, test_get_last_error_null_connection);
     tcase_add_test (tc_conn, test_get_last_error_initial);
     tcase_add_test (tc_conn, test_asset_get_last_error_null);
