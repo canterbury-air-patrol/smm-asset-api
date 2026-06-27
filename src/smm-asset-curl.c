@@ -407,18 +407,6 @@ out:
     return res;
 }
 
-static size_t
-populate_tidy (char *ptr, size_t size, size_t nmemb, void *userdata)
-{
-    size_t total;
-    if (!smm_curl_chunk_size (size, nmemb, &total))
-    {
-        return 0;
-    }
-    tidyBufAppend ((TidyBuffer *)userdata, ptr, total);
-    return total;
-}
-
 /* Bound on how deeply extract_csrfmiddlewaretoken recurses into the parsed
  * login page. A login form is shallow; this only exists so a pathologically
  * nested (hostile) document cannot exhaust the stack. */
@@ -589,7 +577,7 @@ bool
 smm_asset_connection_login (smm_connection connection)
 {
     bool res = false;
-    TidyBuffer docbuf = { 0 };
+    struct buffer_s buf = { NULL, 0 };
     char *csrf_token = NULL;
     smm_connection_status new_state = SMM_CONNECTION_FAILURE;
 
@@ -614,12 +602,12 @@ smm_asset_connection_login (smm_connection connection)
     connection->login_in_progress = true;
     pthread_mutex_unlock (&connection->lock);
 
-    tidyBufInit (&docbuf);
-
     /* Use the raw (non-retrying) fetch so that a redirect on the login page
-     * itself does not recurse back into smm_asset_connection_login. */
+     * itself does not recurse back into smm_asset_connection_login. The login
+     * HTML is buffered through to_buffer, which enforces SMM_MAX_RESPONSE_BYTES;
+     * the bytes are handed to Tidy only after the (capped) transfer completes. */
     struct smm_curl_res_s *res_get
-        = smm_connection_curl_retrieve_url_r (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
+        = smm_connection_curl_retrieve_url_r (connection, "/accounts/login/", NULL, to_buffer, &buf, false);
 
     /* The server may answer a plain-http login GET with a same-host redirect
      * to https (e.g. Django's SECURE_SSL_REDIRECT or a proxy rule). The lazy
@@ -631,17 +619,15 @@ smm_asset_connection_login (smm_connection connection)
     {
         DEBUG ("Upgrading login to https\n");
         smm_curl_res_free (res_get);
-        /* Drop anything the redirect response wrote into the tidy buffer. */
-        tidyBufFree (&docbuf);
-        tidyBufInit (&docbuf);
-        res_get
-            = smm_connection_curl_retrieve_url_r (connection, "/accounts/login/", NULL, populate_tidy, &docbuf, false);
+        /* Drop anything the redirect response wrote into the buffer. */
+        smm_buffer_reset (&buf);
+        res_get = smm_connection_curl_retrieve_url_r (connection, "/accounts/login/", NULL, to_buffer, &buf, false);
     }
 
     if (res_get && res_get->success && res_get->httpcode == HTTP_SUCCESS)
     {
         /* find the input token with the csrfmiddlewaretoken */
-        csrf_token = smm_parse_csrf_token ((const char *)docbuf.bp, docbuf.size);
+        csrf_token = smm_parse_csrf_token (buf.data, buf.bytes);
 
         if (csrf_token)
         {
@@ -684,7 +670,7 @@ smm_asset_connection_login (smm_connection connection)
     }
     smm_curl_res_free (res_get);
 
-    tidyBufFree (&docbuf);
+    smm_buffer_reset (&buf);
 
     /* Publish the CSRF token, state, and last_error under the lock so that
      * readers always see a consistent view of all three fields. */
