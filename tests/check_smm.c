@@ -1117,6 +1117,42 @@ START_TEST (test_invalid_host)
 }
 END_TEST
 
+START_TEST (test_connect_ftp_scheme_invalid)
+{
+    smm_connection conn = smm_asset_connect ("ftp://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connect_file_scheme_invalid)
+{
+    smm_connection conn = smm_asset_connect ("file:///tmp/smm", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connect_mailto_scheme_invalid)
+{
+    smm_connection conn = smm_asset_connect ("mailto:user@example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_connect_schemeless_invalid)
+{
+    smm_connection conn = smm_asset_connect ("example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_HOST_INVALID);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_connect_null_host)
 {
     smm_connection conn = smm_asset_connect (NULL, "user", "pass");
@@ -1575,6 +1611,10 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_state_for_curl_error_http_error_keeps_state);
     tcase_add_test (tc_conn, test_state_for_curl_error_connection_failures);
     tcase_add_test (tc_conn, test_invalid_host);
+    tcase_add_test (tc_conn, test_connect_ftp_scheme_invalid);
+    tcase_add_test (tc_conn, test_connect_file_scheme_invalid);
+    tcase_add_test (tc_conn, test_connect_mailto_scheme_invalid);
+    tcase_add_test (tc_conn, test_connect_schemeless_invalid);
     tcase_add_test (tc_conn, test_connect_null_host);
     tcase_add_test (tc_conn, test_connect_null_user);
     tcase_add_test (tc_conn, test_connect_null_pass);
