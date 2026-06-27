@@ -1,13 +1,31 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "Waiting for SMM to be ready..."
-until docker compose -f tests/docker-compose.yml ps smm | grep -q "healthy"; do
+# Bring the SMM test stack to a ready state and seed it with a test user and
+# asset. The wait for health is bounded so a container that never becomes
+# healthy fails CI in a predictable time with useful diagnostics, instead of
+# hanging the job on an unbounded loop.
+
+COMPOSE="docker compose -f tests/docker-compose.yml"
+
+# Maximum time to wait for SMM to report healthy, in seconds. Override with
+# SMM_PROVISION_TIMEOUT for slower or faster environments.
+TIMEOUT="${SMM_PROVISION_TIMEOUT:-180}"
+
+echo "Waiting up to ${TIMEOUT}s for SMM to be ready..."
+deadline=$(( SECONDS + TIMEOUT ))
+until $COMPOSE ps smm | grep -q "healthy"; do
+  if (( SECONDS >= deadline )); then
+    echo "ERROR: SMM did not become healthy within ${TIMEOUT}s" >&2
+    $COMPOSE ps >&2 || true
+    $COMPOSE logs --no-color smm >&2 || true
+    exit 1
+  fi
   sleep 2
 done
 
 echo "Provisioning test data..."
-docker compose -f tests/docker-compose.yml exec -T smm /code/venv/bin/python manage.py shell <<EOF
+$COMPOSE exec -T smm /code/venv/bin/python manage.py shell <<EOF
 from django.contrib.auth.models import User
 from assets.models import Asset, AssetType
 if not User.objects.filter(username='testuser').exists():
