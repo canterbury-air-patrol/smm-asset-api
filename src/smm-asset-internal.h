@@ -141,6 +141,10 @@ bool smm_connection_state_for_curl_error (CURLcode cres, smm_connection_status *
  * Safe to call on a NULL buffer or one that never received data. */
 void smm_buffer_reset (struct buffer_s *buf);
 
+/* Initialise libcurl's global state once before any other libcurl API use.
+ * Thread-safe (pthread_once); returns true on success. */
+bool smm_curl_global_init (void);
+
 bool smm_connection_share_init (smm_connection conn);
 void smm_connection_share_destroy (smm_connection conn);
 
