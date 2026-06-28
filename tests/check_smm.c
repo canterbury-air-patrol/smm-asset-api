@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <check.h>
 #include <locale.h>
+#include <math.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -575,6 +576,88 @@ START_TEST (test_get_search_null_asset)
 {
     smm_search s = smm_asset_get_search (NULL, -43.5, 172.6);
     ck_assert_ptr_null (s);
+}
+END_TEST
+
+START_TEST (test_coords_valid_accepts_boundaries)
+{
+    ck_assert_int_eq (smm_coords_valid (0.0, 0.0), true);
+    ck_assert_int_eq (smm_coords_valid (90.0, 180.0), true);
+    ck_assert_int_eq (smm_coords_valid (-90.0, -180.0), true);
+}
+END_TEST
+
+START_TEST (test_coords_valid_rejects_nan_inf)
+{
+    ck_assert_int_eq (smm_coords_valid (NAN, 0.0), false);
+    ck_assert_int_eq (smm_coords_valid (0.0, NAN), false);
+    ck_assert_int_eq (smm_coords_valid (INFINITY, 0.0), false);
+    ck_assert_int_eq (smm_coords_valid (0.0, -INFINITY), false);
+}
+END_TEST
+
+START_TEST (test_coords_valid_rejects_out_of_range)
+{
+    ck_assert_int_eq (smm_coords_valid (90.1, 0.0), false);
+    ck_assert_int_eq (smm_coords_valid (-91.0, 0.0), false);
+    ck_assert_int_eq (smm_coords_valid (0.0, 180.1), false);
+    ck_assert_int_eq (smm_coords_valid (0.0, -180.1), false);
+}
+END_TEST
+
+START_TEST (test_position_inputs_valid_heading)
+{
+    ck_assert_int_eq (smm_position_inputs_valid (0.0, 0.0, 359, 3), true);
+    ck_assert_int_eq (smm_position_inputs_valid (0.0, 0.0, 360, 3), false);
+}
+END_TEST
+
+START_TEST (test_position_inputs_valid_fix)
+{
+    ck_assert_int_eq (smm_position_inputs_valid (0.0, 0.0, 0, 0), true);
+    ck_assert_int_eq (smm_position_inputs_valid (0.0, 0.0, 0, 2), true);
+    ck_assert_int_eq (smm_position_inputs_valid (0.0, 0.0, 0, 3), true);
+    ck_assert_int_eq (smm_position_inputs_valid (0.0, 0.0, 0, 1), false);
+    ck_assert_int_eq (smm_position_inputs_valid (0.0, 0.0, 0, 4), false);
+}
+END_TEST
+
+START_TEST (test_position_inputs_valid_full_boundary)
+{
+    ck_assert_int_eq (smm_position_inputs_valid (90.0, 180.0, 359, 3), true);
+    ck_assert_int_eq (smm_position_inputs_valid (-90.0, -180.0, 0, 0), true);
+}
+END_TEST
+
+START_TEST (test_report_position_nan_sets_invalid_arg)
+{
+    /* Invalid inputs are rejected before any network I/O, with the asset's
+     * error recorded. */
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+
+    ck_assert_int_eq (smm_asset_report_position (asset, NAN, 172.6, 100, 270, 3), false);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_INVALID_ARG);
+
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_get_search_nan_sets_invalid_arg)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+
+    ck_assert_ptr_null (smm_asset_get_search (asset, NAN, 172.6));
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_INVALID_ARG);
+
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
 }
 END_TEST
 
@@ -1826,6 +1909,14 @@ smm_suite (void)
     tcase_add_test (tc_position, test_last_command_null_asset);
     tcase_add_test (tc_position, test_last_goto_pos_null_asset);
     tcase_add_test (tc_position, test_get_search_null_asset);
+    tcase_add_test (tc_position, test_coords_valid_accepts_boundaries);
+    tcase_add_test (tc_position, test_coords_valid_rejects_nan_inf);
+    tcase_add_test (tc_position, test_coords_valid_rejects_out_of_range);
+    tcase_add_test (tc_position, test_position_inputs_valid_heading);
+    tcase_add_test (tc_position, test_position_inputs_valid_fix);
+    tcase_add_test (tc_position, test_position_inputs_valid_full_boundary);
+    tcase_add_test (tc_position, test_report_position_nan_sets_invalid_arg);
+    tcase_add_test (tc_position, test_get_search_nan_sets_invalid_arg);
     suite_add_tcase (s, tc_position);
 
     tc_csrf = tcase_create ("CSRF");

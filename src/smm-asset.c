@@ -25,6 +25,7 @@
 
 #include <inttypes.h>
 #include <locale.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -906,6 +907,28 @@ smm_url_path_is_safe (const char *url)
     return true;
 }
 
+bool
+smm_coords_valid (double lat, double lon)
+{
+    /* Reject NaN/infinity outright, then bound to valid WGS84 ranges so a bad
+     * coordinate can never be formatted into a request URL as "nan"/"inf" or
+     * sent as an operationally invalid position. */
+    if (!isfinite (lat) || !isfinite (lon))
+        return false;
+    return lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0;
+}
+
+bool
+smm_position_inputs_valid (double lat, double lon, uint16_t heading, uint8_t fix)
+{
+    if (!smm_coords_valid (lat, lon))
+        return false;
+    if (heading > 359)
+        return false;
+    /* The public API documents fix as 0 (unknown), 2 (2D), or 3 (3D). */
+    return fix == 0 || fix == 2 || fix == 3;
+}
+
 char *
 smm_asset_build_position_url (long long asset_id, double lat, double lon, int32_t alt, uint16_t heading, uint8_t fix)
 {
@@ -926,6 +949,12 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, i
 {
     if (!asset)
     {
+        return false;
+    }
+    if (!smm_position_inputs_valid (latitude, longitude, heading, fix))
+    {
+        smm_asset_set_error (asset, SMM_ERROR_INVALID_ARG,
+                             "invalid position inputs (latitude, longitude, heading, or fix out of range)");
         return false;
     }
     struct buffer_s buf = { NULL, 0 };
@@ -1330,6 +1359,11 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
 {
     if (!asset)
     {
+        return NULL;
+    }
+    if (!smm_coords_valid (latitude, longitude))
+    {
+        smm_asset_set_error (asset, SMM_ERROR_INVALID_ARG, "invalid search coordinates (latitude or longitude)");
         return NULL;
     }
     smm_search search = NULL;
