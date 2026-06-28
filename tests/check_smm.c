@@ -931,26 +931,26 @@ START_TEST (test_set_command_from_plaintext_with_trailing)
 }
 END_TEST
 
-START_TEST (test_build_position_url_heading)
+START_TEST (test_build_position_body_heading)
 {
-    char *url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
-    ck_assert_ptr_nonnull (url);
-    ck_assert_ptr_nonnull (strstr (url, "heading="));
-    ck_assert_ptr_null (strstr (url, "bearing="));
-    free (url);
+    char *body = smm_asset_build_position_body (-43.5, 172.6, 100, 270, 3);
+    ck_assert_ptr_nonnull (body);
+    ck_assert_ptr_nonnull (strstr (body, "heading="));
+    ck_assert_ptr_null (strstr (body, "bearing="));
+    free (body);
 }
 END_TEST
 
 /* Coordinates must always use '.' as the decimal separator regardless of the
  * caller's LC_NUMERIC. We assert this under the current locale (always) and,
  * when a comma-decimal locale is installed, under that locale too. */
-START_TEST (test_build_position_url_locale_independent)
+START_TEST (test_build_position_body_locale_independent)
 {
-    char *url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
-    ck_assert_ptr_nonnull (url);
-    ck_assert_ptr_nonnull (strstr (url, "lat=-43.500000"));
-    ck_assert_ptr_nonnull (strstr (url, "lon=172.600000"));
-    free (url);
+    char *body = smm_asset_build_position_body (-43.5, 172.6, 100, 270, 3);
+    ck_assert_ptr_nonnull (body);
+    ck_assert_ptr_nonnull (strstr (body, "lat=-43.500000"));
+    ck_assert_ptr_nonnull (strstr (body, "lon=172.600000"));
+    free (body);
 
     /* Try a few locales that format decimals with a comma. If none are
      * installed (e.g. a minimal CI image) the loop is a no-op and the
@@ -964,14 +964,14 @@ START_TEST (test_build_position_url_locale_independent)
             continue;
         }
         locale_t old = uselocale (loc);
-        url = smm_asset_build_position_url (42, -43.5, 172.6, 100, 270, 3);
+        body = smm_asset_build_position_body (-43.5, 172.6, 100, 270, 3);
         uselocale (old);
         freelocale (loc);
 
-        ck_assert_ptr_nonnull (url);
-        ck_assert_ptr_nonnull (strstr (url, "lat=-43.500000"));
-        ck_assert_ptr_null (strstr (url, ","));
-        free (url);
+        ck_assert_ptr_nonnull (body);
+        ck_assert_ptr_nonnull (strstr (body, "lat=-43.500000"));
+        ck_assert_ptr_null (strstr (body, ","));
+        free (body);
         break;
     }
 }
@@ -1852,55 +1852,55 @@ START_TEST (test_search_distance_and_length)
 }
 END_TEST
 
-START_TEST (test_build_position_url_values)
+START_TEST (test_build_position_body_values)
 {
-    char *url = smm_asset_build_position_url (7, -43.5, 172.6, 35, 270, 3);
-    ck_assert_ptr_nonnull (url);
-    ck_assert_ptr_nonnull (strstr (url, "assets/7/"));
-    ck_assert_ptr_nonnull (strstr (url, "alt=35"));
-    ck_assert_ptr_nonnull (strstr (url, "heading=270"));
-    ck_assert_ptr_nonnull (strstr (url, "fix=3"));
-    free (url);
+    char *body = smm_asset_build_position_body (-43.5, 172.6, 35, 270, 3);
+    ck_assert_ptr_nonnull (body);
+    ck_assert_ptr_nonnull (strstr (body, "lat=-43.500000"));
+    ck_assert_ptr_nonnull (strstr (body, "alt=35"));
+    ck_assert_ptr_nonnull (strstr (body, "heading=270"));
+    ck_assert_ptr_nonnull (strstr (body, "fix=3"));
+    free (body);
 }
 END_TEST
 
-START_TEST (test_build_position_url_negative_altitude)
+START_TEST (test_build_position_body_negative_altitude)
 {
     /* Altitude may be below mean sea level; it must be sent as a signed value,
      * not wrapped through an unsigned conversion. */
-    char *url = smm_asset_build_position_url (7, -43.5, 172.6, -12, 270, 3);
-    ck_assert_ptr_nonnull (url);
-    ck_assert_ptr_nonnull (strstr (url, "alt=-12"));
-    free (url);
+    char *body = smm_asset_build_position_body (-43.5, 172.6, -12, 270, 3);
+    ck_assert_ptr_nonnull (body);
+    ck_assert_ptr_nonnull (strstr (body, "alt=-12"));
+    free (body);
 }
 END_TEST
 
-START_TEST (test_build_position_url_altitude_int32_range)
+START_TEST (test_build_position_body_altitude_int32_range)
 {
     /* The altitude parameter is int32_t; the full range must format intact. */
-    char *url = smm_asset_build_position_url (7, -43.5, 172.6, INT32_MIN, 270, 3);
-    ck_assert_ptr_nonnull (url);
-    ck_assert_ptr_nonnull (strstr (url, "alt=-2147483648"));
-    free (url);
+    char *body = smm_asset_build_position_body (-43.5, 172.6, INT32_MIN, 270, 3);
+    ck_assert_ptr_nonnull (body);
+    ck_assert_ptr_nonnull (strstr (body, "alt=-2147483648"));
+    free (body);
 
-    url = smm_asset_build_position_url (7, -43.5, 172.6, INT32_MAX, 270, 3);
-    ck_assert_ptr_nonnull (url);
-    ck_assert_ptr_nonnull (strstr (url, "alt=2147483647"));
-    free (url);
+    body = smm_asset_build_position_body (-43.5, 172.6, INT32_MAX, 270, 3);
+    ck_assert_ptr_nonnull (body);
+    ck_assert_ptr_nonnull (strstr (body, "alt=2147483647"));
+    free (body);
 }
 END_TEST
 
-START_TEST (test_build_position_url_heading_boundary)
+START_TEST (test_build_position_body_heading_boundary)
 {
-    char *url0 = smm_asset_build_position_url (1, 0.0, 0.0, 0, 0, 0);
-    ck_assert_ptr_nonnull (url0);
-    ck_assert_ptr_nonnull (strstr (url0, "heading=0"));
-    free (url0);
+    char *body0 = smm_asset_build_position_body (0.0, 0.0, 0, 0, 0);
+    ck_assert_ptr_nonnull (body0);
+    ck_assert_ptr_nonnull (strstr (body0, "heading=0"));
+    free (body0);
 
-    char *url359 = smm_asset_build_position_url (1, 0.0, 0.0, 0, 359, 0);
-    ck_assert_ptr_nonnull (url359);
-    ck_assert_ptr_nonnull (strstr (url359, "heading=359"));
-    free (url359);
+    char *body359 = smm_asset_build_position_body (0.0, 0.0, 0, 359, 0);
+    ck_assert_ptr_nonnull (body359);
+    ck_assert_ptr_nonnull (strstr (body359, "heading=359"));
+    free (body359);
 }
 END_TEST
 
@@ -2154,8 +2154,8 @@ smm_suite (void)
     suite_add_tcase (s, tc_conn);
 
     TCase *tc_position = tcase_create ("Position");
-    tcase_add_test (tc_position, test_build_position_url_heading);
-    tcase_add_test (tc_position, test_build_position_url_locale_independent);
+    tcase_add_test (tc_position, test_build_position_body_heading);
+    tcase_add_test (tc_position, test_build_position_body_locale_independent);
     tcase_add_test (tc_position, test_set_command_from_plaintext_continue);
     tcase_add_test (tc_position, test_set_command_from_plaintext_other);
     tcase_add_test (tc_position, test_set_command_from_plaintext_null);
@@ -2300,10 +2300,10 @@ smm_suite (void)
     suite_add_tcase (s, tc_content_type);
 
     TCase *tc_position_ext = tcase_create ("PositionExt");
-    tcase_add_test (tc_position_ext, test_build_position_url_values);
-    tcase_add_test (tc_position_ext, test_build_position_url_negative_altitude);
-    tcase_add_test (tc_position_ext, test_build_position_url_altitude_int32_range);
-    tcase_add_test (tc_position_ext, test_build_position_url_heading_boundary);
+    tcase_add_test (tc_position_ext, test_build_position_body_values);
+    tcase_add_test (tc_position_ext, test_build_position_body_negative_altitude);
+    tcase_add_test (tc_position_ext, test_build_position_body_altitude_int32_range);
+    tcase_add_test (tc_position_ext, test_build_position_body_heading_boundary);
     tcase_add_test (tc_position_ext, test_asset_last_goto_pos_not_goto);
     tcase_add_test (tc_position_ext, test_asset_last_goto_pos_goto);
     tcase_add_test (tc_position_ext, test_goto_then_malformed_goto_clears_position);

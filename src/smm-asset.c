@@ -931,17 +931,18 @@ smm_position_inputs_valid (double lat, double lon, uint16_t heading, uint8_t fix
 }
 
 char *
-smm_asset_build_position_url (long long asset_id, double lat, double lon, int32_t alt, uint16_t heading, uint8_t fix)
+smm_asset_build_position_body (double lat, double lon, int32_t alt, uint16_t heading, uint8_t fix)
 {
-    char *page = NULL;
-    if (smm_asprintf_c_locale (&page,
-                               "/data/assets/%lld/position/add/?lat=%lf&lon=%lf&alt=%" PRId32 "&heading=%u&fix=%u",
-                               asset_id, lat, lon, alt, heading, fix)
+    char *body = NULL;
+    /* application/x-www-form-urlencoded body for the position POST. The
+     * coordinates are formatted in the C locale so the decimal separator is
+     * always '.'. */
+    if (smm_asprintf_c_locale (&body, "lat=%lf&lon=%lf&alt=%" PRId32 "&heading=%u&fix=%u", lat, lon, alt, heading, fix)
         < 0)
     {
         return NULL;
     }
-    return page;
+    return body;
 }
 
 bool
@@ -960,30 +961,38 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, i
     }
     struct buffer_s buf = { NULL, 0 };
 
-    char *page = smm_asset_build_position_url (asset->asset_id, latitude, longitude, altitude, heading, fix);
-    if (page == NULL)
+    /* The endpoint is POST-only (it mutates state); the position fields go in
+     * the request body and the CSRF token is added as a header by the curl
+     * layer for session-authenticated connections. */
+    char *body = smm_asset_build_position_body (latitude, longitude, altitude, heading, fix);
+    if (body == NULL)
     {
+        return false;
+    }
+    char *page = NULL;
+    if (asprintf (&page, "/data/assets/%lld/position/add/", asset->asset_id) < 0)
+    {
+        free (body);
         return false;
     }
     smm_asset_clear_error (asset);
 
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, &buf, false);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, body, &buf, false);
+    free (page);
+    free (body);
     if (res == NULL)
     {
         smm_asset_set_error (asset, SMM_ERROR_NETWORK, "network failure reporting position");
-        free (page);
+        free (buf.data);
         return false;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
         smm_asset_set_error (asset, SMM_ERROR_SERVER, "unexpected HTTP %ld from position report", res->httpcode);
         smm_curl_res_free (res);
-        free (page);
         free (buf.data);
         return false;
     }
-
-    free (page);
 
     /* if json data was returned, update the current action */
     if (smm_content_type_is_json (res->content_type))
