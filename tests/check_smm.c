@@ -433,7 +433,8 @@ END_TEST
 
 START_TEST (test_waypoint_parsing)
 {
-    const char *json = "{\"features\": [{\"geometry\": {\"coordinates\": [[172.6, -43.5], [172.7, -43.6]]}}]}";
+    const char *json = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [[172.6, -43.5], "
+                       "[172.7, -43.6]]}}]}";
     smm_waypoints waypoints;
     size_t count;
     bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
@@ -1503,7 +1504,8 @@ START_TEST (test_waypoint_parsing_integer_coords)
 {
     /* GeoJSON coordinates may be integers; json_real_value returns 0 for
      * integer JSON nodes, so we must use json_number_value instead. */
-    const char *json = "{\"features\": [{\"geometry\": {\"coordinates\": [[173, -44], [172, -43]]}}]}";
+    const char *json
+        = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [[173, -44], [172, -43]]}}]}";
     smm_waypoints waypoints;
     size_t count;
     bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
@@ -1544,6 +1546,106 @@ END_TEST
 START_TEST (test_waypoints_parsing_no_features_key)
 {
     const char *json = "{\"type\": \"FeatureCollection\"}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_non_linestring)
+{
+    const char *json = "{\"features\": [{\"geometry\": {\"type\": \"Point\", \"coordinates\": [[172.6, -43.5], [172.7, "
+                       "-43.6]]}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_single_point)
+{
+    /* A LineString needs at least two points; one is a malformed route. */
+    const char *json
+        = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [[172.6, -43.5]]}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_empty_coordinates)
+{
+    const char *json = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": []}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_non_array_entry)
+{
+    /* Coordinate entries must themselves be [lon, lat] arrays. */
+    const char *json = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [172.6, -43.5]}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_tuple_missing_lat)
+{
+    const char *json
+        = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [[172.6], [172.7]]}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_nonnumeric_coord)
+{
+    const char *json = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [[\"x\", \"y\"], "
+                       "[\"a\", \"b\"]]}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_one_valid_one_invalid)
+{
+    /* A single bad point fails the whole parse rather than returning a
+     * truncated route; the partially-built list must be discarded. */
+    const char *json = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [[172.6, -43.5], "
+                       "[\"x\", \"y\"]]}}]}";
+    smm_waypoints waypoints = NULL;
+    size_t count = 0;
+    bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
+    ck_assert_uint_eq (res, false);
+    ck_assert_uint_eq (count, 0);
+    ck_assert_ptr_null (waypoints);
+}
+END_TEST
+
+START_TEST (test_waypoints_parsing_out_of_range)
+{
+    const char *json
+        = "{\"features\": [{\"geometry\": {\"type\": \"LineString\", \"coordinates\": [[200.0, 0.0], [0.0, "
+          "0.0]]}}]}";
     smm_waypoints waypoints = NULL;
     size_t count = 0;
     bool res = smm_parse_waypoints (json, strlen (json), &waypoints, &count);
@@ -1969,6 +2071,14 @@ smm_suite (void)
     tcase_add_test (tc_waypoints, test_waypoints_parsing_missing_geometry);
     tcase_add_test (tc_waypoints, test_waypoints_parsing_missing_coordinates);
     tcase_add_test (tc_waypoints, test_waypoints_parsing_no_features_key);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_non_linestring);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_single_point);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_empty_coordinates);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_non_array_entry);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_tuple_missing_lat);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_nonnumeric_coord);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_one_valid_one_invalid);
+    tcase_add_test (tc_waypoints, test_waypoints_parsing_out_of_range);
     suite_add_tcase (s, tc_waypoints);
 
     TCase *tc_search = tcase_create ("Search");
