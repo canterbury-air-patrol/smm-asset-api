@@ -23,8 +23,8 @@
 #include "smm-asset.h"
 #include "smm-asset-internal.h"
 
+#include <errno.h>
 #include <inttypes.h>
-#include <limits.h>
 #include <locale.h>
 #include <math.h>
 #include <pthread.h>
@@ -1375,24 +1375,21 @@ smm_search_parse_object_url (const char *url, long long *id_out)
         return false;
 
     const char *p = url + prefix_len;
+    /* Require the id to start with a digit: strtoll would otherwise skip
+     * leading whitespace and accept a sign, loosening the strict
+     * "/search/<digits>/" shape. */
     if (*p < '0' || *p > '9')
-        return false; /* require at least one digit */
+        return false;
 
-    long long id = 0;
-    while (*p >= '0' && *p <= '9')
-    {
-        int digit = *p - '0';
-        if (id > (LLONG_MAX - digit) / 10)
-            return false; /* would overflow */
-        id = id * 10 + digit;
-        p++;
-    }
+    errno = 0;
+    char *end = NULL;
+    long long id = strtoll (p, &end, 10);
+    if (errno == ERANGE || id <= 0)
+        return false; /* overflow, or a non-positive id ("/search/0/") */
 
     /* Exactly one trailing '/' and nothing else may follow the id. */
-    if (p[0] != '/' || p[1] != '\0')
+    if (end[0] != '/' || end[1] != '\0')
         return false;
-    if (id <= 0)
-        return false; /* positive ids only; "/search/0/" is rejected */
 
     *id_out = id;
     return true;
