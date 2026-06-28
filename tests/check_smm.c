@@ -662,6 +662,25 @@ START_TEST (test_get_search_nan_sets_invalid_arg)
 }
 END_TEST
 
+START_TEST (test_get_search_out_of_range_sets_invalid_arg)
+{
+    /* get_search must enforce the same coordinate bounds as the position path. */
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+
+    ck_assert_ptr_null (smm_asset_get_search (asset, 90.1, 0.0));
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_INVALID_ARG);
+
+    ck_assert_ptr_null (smm_asset_get_search (asset, 0.0, -180.1));
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_INVALID_ARG);
+
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_last_command_null_asset)
 {
     smm_asset_command cmd = smm_asset_last_command (NULL);
@@ -2019,6 +2038,7 @@ smm_suite (void)
     tcase_add_test (tc_position, test_position_inputs_valid_full_boundary);
     tcase_add_test (tc_position, test_report_position_nan_sets_invalid_arg);
     tcase_add_test (tc_position, test_get_search_nan_sets_invalid_arg);
+    tcase_add_test (tc_position, test_get_search_out_of_range_sets_invalid_arg);
     suite_add_tcase (s, tc_position);
 
     tc_csrf = tcase_create ("CSRF");
