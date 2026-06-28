@@ -24,6 +24,7 @@
 #include "smm-asset-internal.h"
 
 #include <inttypes.h>
+#include <limits.h>
 #include <locale.h>
 #include <math.h>
 #include <pthread.h>
@@ -1002,7 +1003,7 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, i
 }
 
 static smm_search
-smm_search_create (smm_asset asset, const char *url, uint64_t length, uint64_t distance, uint64_t sweep_width)
+smm_search_create (smm_asset asset, long long search_id, uint64_t length, uint64_t distance, uint64_t sweep_width)
 {
     smm_search search = calloc (1, sizeof (struct smm_search_s));
     if (search == NULL)
@@ -1017,14 +1018,7 @@ smm_search_create (smm_asset asset, const char *url, uint64_t length, uint64_t d
         smm_connection_ref (asset->conn);
     }
 
-    search->url = url ? strdup (url) : NULL;
-    if (url && !search->url)
-    {
-        smm_connection_unref (search->conn);
-        free (search);
-        return NULL;
-    }
-
+    search->search_id = search_id;
     search->length = length;
     search->distance = distance;
     search->sweep_width = sweep_width;
@@ -1068,7 +1062,6 @@ smm_search_destroy (smm_search search)
     if (search)
     {
         smm_connection_unref (search->conn);
-        free (search->url);
         free (search);
     }
 }
@@ -1242,7 +1235,17 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
     *waypoints_count = 0;
     smm_search_clear_error (search);
 
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, search->url, NULL, &buf, true);
+    /* Build the request path from the parsed search id rather than reusing a
+     * server-supplied string, so it can only ever be /search/<id>/. */
+    char *page = NULL;
+    if (asprintf (&page, "/search/%lld/", search->search_id) < 0)
+    {
+        smm_search_set_error (search, SMM_ERROR_NETWORK, "failed to build waypoints request");
+        return false;
+    }
+
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, page, NULL, &buf, true);
+    free (page);
 
     if (res == NULL)
     {
@@ -1279,7 +1282,9 @@ smm_search_action (smm_search search, const char *action)
     char *action_page = NULL;
     struct buffer_s buf = { NULL, 0 };
 
-    if (asprintf (&action_page, "%s%s/?asset_id=%lli", search->url, action, search->asset_id) < 0)
+    /* Build the path from the parsed search id, not a server string, so it can
+     * only ever be /search/<id>/<action>/. */
+    if (asprintf (&action_page, "/search/%lld/%s/?asset_id=%lli", search->search_id, action, search->asset_id) < 0)
     {
         return false;
     }
@@ -1354,6 +1359,45 @@ smm_json_number_to_u64 (const json_t *value)
     return (uint64_t)d;
 }
 
+/* Validate and parse a server-supplied search object_url. Accepts only the
+ * documented shape "/search/<positive-id>/" and writes the id to *id_out.
+ * Returns false for any other path. Driving the actual request paths from this
+ * parsed id (rather than reusing an arbitrary server string) keeps the search
+ * API from being pointed at an unintended same-host endpoint, which the generic
+ * smm_url_path_is_safe() predicate alone would allow (e.g. /accounts/logout/). */
+static bool
+smm_search_parse_object_url (const char *url, long long *id_out)
+{
+    static const char prefix[] = "/search/";
+    const size_t prefix_len = sizeof (prefix) - 1;
+
+    if (url == NULL || strncmp (url, prefix, prefix_len) != 0)
+        return false;
+
+    const char *p = url + prefix_len;
+    if (*p < '0' || *p > '9')
+        return false; /* require at least one digit */
+
+    long long id = 0;
+    while (*p >= '0' && *p <= '9')
+    {
+        int digit = *p - '0';
+        if (id > (LLONG_MAX - digit) / 10)
+            return false; /* would overflow */
+        id = id * 10 + digit;
+        p++;
+    }
+
+    /* Exactly one trailing '/' and nothing else may follow the id. */
+    if (p[0] != '/' || p[1] != '\0')
+        return false;
+    if (id <= 0)
+        return false; /* positive ids only; "/search/0/" is rejected */
+
+    *id_out = id;
+    return true;
+}
+
 smm_search
 smm_parse_search_json (smm_asset asset, const char *data, size_t len)
 {
@@ -1365,6 +1409,7 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
     if (json_root)
     {
         const char *url = NULL;
+        long long search_id = 0;
         uint64_t distance = 0;
         uint64_t length = 0;
         uint64_t sweep_width = 0;
@@ -1373,21 +1418,20 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
         {
             url = json_string_value (tmp);
         }
-        /* Validate the server-supplied path: must be a safe relative path
-         * with no '..' segments, query strings, fragments, or percent-
-         * encoded characters that could redirect requests at an arbitrary
-         * endpoint. */
-        if (url && !smm_url_path_is_safe (url))
+        /* Accept only the documented "/search/<positive-id>/" shape. The
+         * generic smm_url_path_is_safe() predicate is kept for other callers
+         * but is not the trust boundary for search actions. */
+        bool url_ok = smm_search_parse_object_url (url, &search_id);
+        if (url && !url_ok)
         {
-            DEBUG ("object_url is not a safe relative path; ignoring\n");
-            url = NULL;
+            DEBUG ("object_url is not a /search/<id>/ path; ignoring\n");
         }
         distance = smm_json_number_to_u64 (json_object_get (json_root, "distance"));
         length = smm_json_number_to_u64 (json_object_get (json_root, "length"));
         sweep_width = smm_json_number_to_u64 (json_object_get (json_root, "sweep_width"));
-        if (url)
+        if (url_ok)
         {
-            search = smm_search_create (asset, url, length, distance, sweep_width);
+            search = smm_search_create (asset, search_id, length, distance, sweep_width);
         }
         json_decref (json_root);
     }
