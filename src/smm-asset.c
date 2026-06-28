@@ -1092,6 +1092,41 @@ smm_waypoint_free (smm_waypoint waypoint)
     free (waypoint);
 }
 
+/* Parse one GeoJSON [lon, lat] coordinate tuple into a waypoint. Returns false
+ * (creating no waypoint) for a non-array entry, a missing or non-numeric
+ * coordinate, an out-of-range coordinate, or an allocation failure — each of
+ * which fails the whole route parse rather than being silently skipped. */
+static bool
+smm_parse_waypoint_tuple (json_t *value, size_t index, smm_waypoint *out_wp)
+{
+    if (!json_is_array (value))
+    {
+        DEBUG ("malformed coordinate tuple at index %zu\n", index);
+        return false;
+    }
+    json_t *json_lon = json_array_get (value, 0);
+    json_t *json_lat = json_array_get (value, 1);
+    if (!json_is_number (json_lon) || !json_is_number (json_lat))
+    {
+        DEBUG ("malformed coordinate tuple at index %zu\n", index);
+        return false;
+    }
+    double lon = json_number_value (json_lon);
+    double lat = json_number_value (json_lat);
+    if (!smm_coords_valid (lat, lon))
+    {
+        DEBUG ("coordinate out of range at index %zu\n", index);
+        return false;
+    }
+    smm_waypoint wp = smm_waypoint_create (lat, lon);
+    if (wp == NULL)
+    {
+        return false;
+    }
+    *out_wp = wp;
+    return true;
+}
+
 bool
 smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, size_t *waypoints_count)
 {
@@ -1119,39 +1154,25 @@ smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, siz
                         json_t *json_type = json_object_get (json_geometry, "type");
                         json_t *json_coords = json_object_get (json_geometry, "coordinates");
                         /* The search route is a GeoJSON LineString with at least
-                         * two points. Require the declared type and a coordinate
-                         * array of the minimum length; anything else is a
-                         * malformed route rather than a (possibly empty or
-                         * truncated) success. */
-                        if (json_is_string (json_type) && strcmp (json_string_value (json_type), "LineString") == 0
-                            && json_is_array (json_coords) && json_array_size (json_coords) >= 2)
+                         * two points; anything else is a malformed route rather
+                         * than a (possibly empty or truncated) success. */
+                        if (!json_is_string (json_type) || strcmp (json_string_value (json_type), "LineString") != 0)
+                        {
+                            DEBUG ("geometry type is not LineString\n");
+                        }
+                        else if (!json_is_array (json_coords) || json_array_size (json_coords) < 2)
+                        {
+                            DEBUG ("geometry does not have at least two coordinates\n");
+                        }
+                        else
                         {
                             bool ok = true;
                             size_t index = 0;
                             json_t *value = NULL;
                             json_array_foreach (json_coords, index, value)
                             {
-                                json_t *json_lon = json_array_get (value, 0);
-                                json_t *json_lat = json_array_get (value, 1);
-                                /* Any malformed tuple fails the whole parse
-                                 * rather than being silently skipped, so a
-                                 * truncated route is never reported. */
-                                if (!json_is_array (value) || !json_is_number (json_lon) || !json_is_number (json_lat))
-                                {
-                                    DEBUG ("malformed coordinate tuple at index %zu\n", index);
-                                    ok = false;
-                                    break;
-                                }
-                                double lon = json_number_value (json_lon);
-                                double lat = json_number_value (json_lat);
-                                if (!smm_coords_valid (lat, lon))
-                                {
-                                    DEBUG ("coordinate out of range at index %zu\n", index);
-                                    ok = false;
-                                    break;
-                                }
-                                smm_waypoint new_wp = smm_waypoint_create (lat, lon);
-                                if (new_wp == NULL)
+                                smm_waypoint new_wp = NULL;
+                                if (!smm_parse_waypoint_tuple (value, index, &new_wp))
                                 {
                                     ok = false;
                                     break;
@@ -1169,10 +1190,6 @@ smm_parse_waypoints (const char *data, size_t len, smm_waypoints *waypoints, siz
                                 *waypoints_count += 1;
                             }
                             res = ok;
-                        }
-                        else
-                        {
-                            DEBUG ("geometry is not a LineString with >= 2 coordinates\n");
                         }
                     }
                 }
