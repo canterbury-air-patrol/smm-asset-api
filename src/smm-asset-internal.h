@@ -36,6 +36,7 @@ enum http_return_codes
     HTTP_MOVED_PERMANENTLY = 301,
     HTTP_FOUND = 302,
     HTTP_SEE_OTHER = 303,
+    HTTP_NOT_FOUND = 404,
 };
 
 #define SMM_CURL_CONNECT_TIMEOUT_SECS 30L
@@ -193,6 +194,13 @@ bool smm_position_inputs_valid (double lat, double lon, uint16_t heading, uint8_
 void smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len);
 
 smm_search smm_parse_search_json (smm_asset asset, const char *data, size_t len);
+
+/* Map a closest-search HTTP response to a search result, recording the asset
+ * error on failure. A 404 is the server's documented "no suitable searches"
+ * result: returns NULL with no error. Returns the search (caller owns it) or
+ * NULL. Exposed for testing. */
+smm_search smm_search_from_response (smm_asset asset, long httpcode, const char *content_type, const char *data,
+                                     size_t len);
 
 /* Returns true for the HTTP status codes we treat as followable redirects
  * (301, 302, 303). */
