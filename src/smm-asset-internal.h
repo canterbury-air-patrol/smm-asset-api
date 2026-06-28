@@ -184,6 +184,12 @@ void smm_asset_free_asset (smm_asset assets);
 char *smm_asset_build_position_url (long long asset_id, double lat, double lon, int32_t alt, uint16_t heading,
                                     uint8_t fix);
 
+/* Validate outbound coordinates: finite and within WGS84 ranges
+ * (lat [-90,90], lon [-180,180]). */
+bool smm_coords_valid (double lat, double lon);
+/* As smm_coords_valid, and require heading in [0,359] and fix in {0,2,3}. */
+bool smm_position_inputs_valid (double lat, double lon, uint16_t heading, uint8_t fix);
+
 void smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t len);
 
 smm_search smm_parse_search_json (smm_asset asset, const char *data, size_t len);
