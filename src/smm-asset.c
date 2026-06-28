@@ -1407,9 +1407,6 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
     {
         const char *url = NULL;
         long long search_id = 0;
-        uint64_t distance = 0;
-        uint64_t length = 0;
-        uint64_t sweep_width = 0;
         json_t *tmp = json_object_get (json_root, "object_url");
         if (tmp)
         {
@@ -1419,24 +1416,51 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
          * generic smm_url_path_is_safe() predicate is kept for other callers
          * but is not the trust boundary for search actions. */
         bool url_ok = smm_search_parse_object_url (url, &search_id);
-        if (url && !url_ok)
-        {
-            DEBUG ("object_url is not a /search/<id>/ path; ignoring\n");
-        }
-        distance = smm_json_number_to_u64 (json_object_get (json_root, "distance"));
-        length = smm_json_number_to_u64 (json_object_get (json_root, "length"));
-        sweep_width = smm_json_number_to_u64 (json_object_get (json_root, "sweep_width"));
         if (url_ok)
         {
+            uint64_t distance = smm_json_number_to_u64 (json_object_get (json_root, "distance"));
+            uint64_t length = smm_json_number_to_u64 (json_object_get (json_root, "length"));
+            uint64_t sweep_width = smm_json_number_to_u64 (json_object_get (json_root, "sweep_width"));
             search = smm_search_create (asset, search_id, length, distance, sweep_width);
+        }
+        else
+        {
+            /* A successful closest-search response always carries a valid
+             * /search/<id>/ object_url; a missing, non-string, or unexpected
+             * one is a protocol violation by the server. */
+            DEBUG ("object_url is missing or not a /search/<id>/ path\n");
+            smm_asset_set_error (asset, SMM_ERROR_PROTOCOL, "search response has a missing or invalid object_url");
         }
         json_decref (json_root);
     }
     else
     {
         DEBUG ("JSON Parse Error on line %i: %s\n", json_error.line, json_error.text);
+        smm_asset_set_error (asset, SMM_ERROR_PARSE, "failed to parse closest search JSON");
     }
     return search;
+}
+
+smm_search
+smm_search_from_response (smm_asset asset, long httpcode, const char *content_type, const char *data, size_t len)
+{
+    if (httpcode == HTTP_NOT_FOUND)
+    {
+        /* The server's documented "no suitable searches exist" result. This is
+         * a clean no-search outcome, not an error. */
+        return NULL;
+    }
+    if (httpcode != HTTP_SUCCESS)
+    {
+        smm_asset_set_error (asset, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching closest search", httpcode);
+        return NULL;
+    }
+    if (!smm_content_type_is_json (content_type))
+    {
+        smm_asset_set_error (asset, SMM_ERROR_PROTOCOL, "non-JSON response to closest search");
+        return NULL;
+    }
+    return smm_parse_search_json (asset, data, len);
 }
 
 smm_search
@@ -1451,7 +1475,6 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
         smm_asset_set_error (asset, SMM_ERROR_INVALID_ARG, "invalid search coordinates (latitude or longitude)");
         return NULL;
     }
-    smm_search search = NULL;
     struct buffer_s buf = { NULL, 0 };
 
     char *page = NULL;
@@ -1464,26 +1487,15 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     smm_asset_clear_error (asset);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, &buf, false);
+    free (page);
     if (res == NULL)
     {
         smm_asset_set_error (asset, SMM_ERROR_NETWORK, "network failure fetching closest search");
-        free (page);
-        return NULL;
-    }
-    if (!(res->success && res->httpcode == HTTP_SUCCESS))
-    {
-        smm_asset_set_error (asset, SMM_ERROR_SERVER, "unexpected HTTP %ld fetching closest search", res->httpcode);
-        smm_curl_res_free (res);
-        free (page);
         free (buf.data);
         return NULL;
     }
-    free (page);
 
-    if (smm_content_type_is_json (res->content_type))
-    {
-        search = smm_parse_search_json (asset, buf.data, buf.bytes);
-    }
+    smm_search search = smm_search_from_response (asset, res->httpcode, res->content_type, buf.data, buf.bytes);
     smm_curl_res_free (res);
     free (buf.data);
     return search;

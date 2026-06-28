@@ -541,6 +541,109 @@ END_TEST
 START_TEST (test_get_search_zero_id_rejected) { ck_assert_ptr_null (parse_search_with_object_url ("/search/0/")); }
 END_TEST
 
+static smm_asset
+make_connected_test_asset (smm_connection *conn_out)
+{
+    smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+    *conn_out = conn;
+    return asset;
+}
+
+START_TEST (test_search_from_response_404_is_clean_no_search)
+{
+    smm_connection conn;
+    smm_asset asset = make_connected_test_asset (&conn);
+    const char *body = "No suitable searches exist";
+    smm_search search = smm_search_from_response (asset, 404, "text/plain", body, strlen (body));
+    ck_assert_ptr_null (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_NONE);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_search_from_response_non_json_200_sets_protocol)
+{
+    smm_connection conn;
+    smm_asset asset = make_connected_test_asset (&conn);
+    const char *body = "<html>not json</html>";
+    smm_search search = smm_search_from_response (asset, 200, "text/html", body, strlen (body));
+    ck_assert_ptr_null (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_PROTOCOL);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_search_from_response_invalid_json_sets_parse)
+{
+    smm_connection conn;
+    smm_asset asset = make_connected_test_asset (&conn);
+    const char *body = "not json at all";
+    smm_search search = smm_search_from_response (asset, 200, "application/json", body, strlen (body));
+    ck_assert_ptr_null (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_PARSE);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_search_from_response_missing_object_url_sets_protocol)
+{
+    smm_connection conn;
+    smm_asset asset = make_connected_test_asset (&conn);
+    const char *body = "{\"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_search_from_response (asset, 200, "application/json", body, strlen (body));
+    ck_assert_ptr_null (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_PROTOCOL);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_search_from_response_unsafe_object_url_sets_protocol)
+{
+    smm_connection conn;
+    smm_asset asset = make_connected_test_asset (&conn);
+    const char *body
+        = "{\"object_url\": \"/accounts/logout/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_search_from_response (asset, 200, "application/json", body, strlen (body));
+    ck_assert_ptr_null (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_PROTOCOL);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_search_from_response_valid_returns_search)
+{
+    smm_connection conn;
+    smm_asset asset = make_connected_test_asset (&conn);
+    const char *body = "{\"object_url\": \"/search/1/\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}";
+    smm_search search = smm_search_from_response (asset, 200, "application/json", body, strlen (body));
+    ck_assert_ptr_nonnull (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_NONE);
+    smm_search_destroy (search);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_search_from_response_server_error_sets_server)
+{
+    smm_connection conn;
+    smm_asset asset = make_connected_test_asset (&conn);
+    smm_search search = smm_search_from_response (asset, 500, "text/plain", "oops", 4);
+    ck_assert_ptr_null (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_SERVER);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_get_search_real_numeric_fields)
 {
     /* The server contract does not guarantee integers; a real-valued
@@ -2160,6 +2263,13 @@ smm_suite (void)
     tcase_add_test (tc_search, test_get_search_non_numeric_id_rejected);
     tcase_add_test (tc_search, test_get_search_negative_id_rejected);
     tcase_add_test (tc_search, test_get_search_zero_id_rejected);
+    tcase_add_test (tc_search, test_search_from_response_404_is_clean_no_search);
+    tcase_add_test (tc_search, test_search_from_response_non_json_200_sets_protocol);
+    tcase_add_test (tc_search, test_search_from_response_invalid_json_sets_parse);
+    tcase_add_test (tc_search, test_search_from_response_missing_object_url_sets_protocol);
+    tcase_add_test (tc_search, test_search_from_response_unsafe_object_url_sets_protocol);
+    tcase_add_test (tc_search, test_search_from_response_valid_returns_search);
+    tcase_add_test (tc_search, test_search_from_response_server_error_sets_server);
     suite_add_tcase (s, tc_search);
 
     TCase *tc_url = tcase_create ("URL");
