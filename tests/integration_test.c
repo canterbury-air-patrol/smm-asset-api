@@ -53,6 +53,20 @@ main (void)
         printf ("Asset: %s (%s)\n", smm_asset_name (assets[i]), smm_asset_type (assets[i]));
     }
 
+    /* Report a position. The endpoint is POST-only and CSRF-protected, so this
+     * exercises the POST body and the X-CSRFToken header against a live server. */
+    printf ("Reporting position for asset %s...\n", smm_asset_name (assets[0]));
+    if (!smm_asset_report_position (assets[0], -43.5, 172.6, 35, 270, 3))
+    {
+        char msg[256];
+        smm_error_code code = smm_asset_get_last_error (assets[0], msg, sizeof (msg));
+        fprintf (stderr, "Failed to report position (error %d: %s)\n", code, msg);
+        smm_asset_free_assets (assets, count);
+        smm_connection_close (conn);
+        return 1;
+    }
+    printf ("Position reported.\n");
+
     smm_asset_free_assets (assets, count);
     smm_connection_close (conn);
 

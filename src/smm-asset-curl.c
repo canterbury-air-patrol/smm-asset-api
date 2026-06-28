@@ -264,6 +264,71 @@ smm_buffer_reset (struct buffer_s *buf)
     }
 }
 
+/* If a libcurl CURLINFO_COOKIELIST line names the wanted cookie, return a copy
+ * of its value, else NULL. The line is Netscape format with seven tab-separated
+ * fields: domain, flag, path, secure, expiry, name, value. */
+static char *
+smm_cookie_value_if_name (const char *line, const char *name)
+{
+    const char *fields[7];
+    int n = 0;
+    const char *p = line;
+
+    fields[n++] = p;
+    while (n < 7 && (p = strchr (p, '\t')) != NULL)
+    {
+        p++;
+        fields[n++] = p;
+    }
+    if (n < 7)
+    {
+        return NULL;
+    }
+
+    /* The name occupies [fields[5], fields[6] - 1) (the byte before the value
+     * is the separating tab); the value runs from fields[6] to end of line. */
+    size_t name_len = (size_t)(fields[6] - 1 - fields[5]);
+    if (strlen (name) != name_len || strncmp (fields[5], name, name_len) != 0)
+    {
+        return NULL;
+    }
+    return strdup (fields[6]);
+}
+
+/* Refresh the connection's stored CSRF token from the csrftoken cookie in the
+ * handle's cookie jar. Django rotates the CSRF token on login, so the token
+ * captured from the login page goes stale; tracking the cookie after every
+ * request keeps a token that matches the cookie the server will check. */
+static void
+smm_connection_update_csrf_from_cookies (smm_connection conn, CURL *curl)
+{
+    struct curl_slist *cookies = NULL;
+    if (curl_easy_getinfo (curl, CURLINFO_COOKIELIST, &cookies) != CURLE_OK)
+    {
+        return;
+    }
+
+    char *token = NULL;
+    for (const struct curl_slist *c = cookies; c != NULL; c = c->next)
+    {
+        char *value = smm_cookie_value_if_name (c->data, "csrftoken");
+        if (value)
+        {
+            free (token);
+            token = value;
+        }
+    }
+    curl_slist_free_all (cookies);
+
+    if (token)
+    {
+        pthread_mutex_lock (&conn->lock);
+        free (conn->csrfmiddlewaretoken);
+        conn->csrfmiddlewaretoken = token;
+        pthread_mutex_unlock (&conn->lock);
+    }
+}
+
 struct smm_curl_res_s *
 smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const char *post_data,
                                     size_t (*write_func) (char *ptr, size_t size, size_t nmemb, void *userdata),
@@ -276,6 +341,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     long transfer_timeout = 0;
     CURLSH *share = NULL;
     struct curl_slist *headers = NULL;
+    char *csrf_token = NULL;
     bool have_ref = false;
 
     /* Never log post_data: for the login request it carries the user's
@@ -299,6 +365,11 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     connect_timeout = conn->connect_timeout_secs;
     transfer_timeout = conn->transfer_timeout_secs;
     share = conn->share;
+    /* Snapshot the current CSRF token so a POST can present it as a header. */
+    if (post_data && conn->csrfmiddlewaretoken)
+    {
+        csrf_token = strdup (conn->csrfmiddlewaretoken);
+    }
     conn->refcount++;
     have_ref = true;
 
@@ -354,6 +425,21 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     if (json)
     {
         headers = curl_slist_append (headers, "Accept: application/json");
+    }
+    /* Present the CSRF token as a header on POSTs. Using the header (rather than
+     * a form field) means a request retried after a lazy login re-reads the
+     * freshly rotated token, instead of resending a body fixed before login. */
+    if (csrf_token)
+    {
+        char *csrf_header = NULL;
+        if (asprintf (&csrf_header, "X-CSRFToken: %s", csrf_token) >= 0)
+        {
+            headers = curl_slist_append (headers, csrf_header);
+            free (csrf_header);
+        }
+    }
+    if (headers)
+    {
         curl_easy_setopt (curl, CURLOPT_HTTPHEADER, headers);
     }
 
@@ -361,6 +447,10 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     CURLcode cres = curl_easy_perform (curl);
     DEBUG ("curl returned %i\n", cres);
     res->success = (cres == CURLE_OK);
+
+    /* Keep the stored CSRF token current with the cookie jar (the server may
+     * set or rotate the csrftoken cookie on any response, notably login). */
+    smm_connection_update_csrf_from_cookies (conn, curl);
 
     if (cres != CURLE_OK)
     {
@@ -410,6 +500,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     }
 
 out:
+    free (csrf_token);
     if (headers)
     {
         curl_slist_free_all (headers);
