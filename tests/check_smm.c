@@ -505,6 +505,42 @@ START_TEST (test_get_search_relative_url_accepted)
 }
 END_TEST
 
+static smm_search
+parse_search_with_object_url (const char *object_url)
+{
+    char *json = NULL;
+    int n = asprintf (&json, "{\"object_url\": \"%s\", \"distance\": 10, \"length\": 100, \"sweep_width\": 50}",
+                      object_url);
+    ck_assert_int_ge (n, 0);
+    smm_search search = smm_parse_search_json (NULL, json, strlen (json));
+    free (json);
+    return search;
+}
+
+START_TEST (test_get_search_root_url_rejected) { ck_assert_ptr_null (parse_search_with_object_url ("/")); }
+END_TEST
+
+START_TEST (test_get_search_assets_url_rejected) { ck_assert_ptr_null (parse_search_with_object_url ("/assets/1/")); }
+END_TEST
+
+START_TEST (test_get_search_logout_url_rejected)
+{
+    ck_assert_ptr_null (parse_search_with_object_url ("/accounts/logout/"));
+}
+END_TEST
+
+START_TEST (test_get_search_non_numeric_id_rejected)
+{
+    ck_assert_ptr_null (parse_search_with_object_url ("/search/not-an-id/"));
+}
+END_TEST
+
+START_TEST (test_get_search_negative_id_rejected) { ck_assert_ptr_null (parse_search_with_object_url ("/search/-1/")); }
+END_TEST
+
+START_TEST (test_get_search_zero_id_rejected) { ck_assert_ptr_null (parse_search_with_object_url ("/search/0/")); }
+END_TEST
+
 START_TEST (test_get_search_real_numeric_fields)
 {
     /* The server contract does not guarantee integers; a real-valued
@@ -536,10 +572,9 @@ START_TEST (test_search_accept_null_conn)
     memset (&search_s, 0, sizeof (search_s));
     search_s.conn = NULL;
     search_s.asset_id = 1;
-    search_s.url = strdup ("/search/1/");
+    search_s.search_id = 1;
     bool r = smm_search_accept (&search_s);
     ck_assert_int_eq (r, false);
-    free (search_s.url);
 }
 END_TEST
 
@@ -948,10 +983,9 @@ START_TEST (test_search_action_sets_search_error_not_conn)
     memset (&search_s, 0, sizeof (search_s));
     search_s.conn = NULL;
     search_s.asset_id = 1;
-    search_s.url = strdup ("/search/1/");
+    search_s.search_id = 1;
     smm_search_accept (&search_s);
     ck_assert_int_ne (smm_search_get_last_error (&search_s, NULL, 0), SMM_ERROR_NONE);
-    free (search_s.url);
 }
 END_TEST
 
@@ -2120,6 +2154,12 @@ smm_suite (void)
     tcase_add_test (tc_search, test_get_search_dotdot_url_rejected);
     tcase_add_test (tc_search, test_get_search_query_url_rejected);
     tcase_add_test (tc_search, test_get_search_encoded_url_rejected);
+    tcase_add_test (tc_search, test_get_search_root_url_rejected);
+    tcase_add_test (tc_search, test_get_search_assets_url_rejected);
+    tcase_add_test (tc_search, test_get_search_logout_url_rejected);
+    tcase_add_test (tc_search, test_get_search_non_numeric_id_rejected);
+    tcase_add_test (tc_search, test_get_search_negative_id_rejected);
+    tcase_add_test (tc_search, test_get_search_zero_id_rejected);
     suite_add_tcase (s, tc_search);
 
     TCase *tc_url = tcase_create ("URL");

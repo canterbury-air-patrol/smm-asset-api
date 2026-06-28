@@ -107,7 +107,7 @@ struct smm_search_s
 {
     smm_connection conn; /* owns a reference; acquired in smm_search_create */
     long long asset_id;  /* cached from the creating asset */
-    char *url;
+    long long search_id; /* parsed from object_url; request paths built from it */
     uint64_t distance;
     uint64_t length;
     uint64_t sweep_width;
