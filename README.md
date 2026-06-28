@@ -32,11 +32,16 @@ Basic API usage example
 
 int main(int argc, char *argv[])
 {
-	smm_assets assets;
-	size_t assets_count;
+	smm_assets assets = NULL;
+	size_t assets_count = 0;
 	smm_asset asset = NULL;
 
 	smm_connection conn = smm_asset_connect ("http://localhost/", "asset", "assetpassword");
+	if (conn == NULL)
+	{
+		return 1;
+	}
+
 	if (smm_asset_get_assets (conn, &assets, &assets_count))
 	{
 		for (size_t i = 0; i < assets_count; i++)
@@ -82,6 +87,8 @@ int main(int argc, char *argv[])
 
 	smm_asset_free_assets (assets, assets_count);
 	smm_connection_close (conn);
+
+	return 0;
 }
 ```
 
