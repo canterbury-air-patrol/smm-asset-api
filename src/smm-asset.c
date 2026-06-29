@@ -249,6 +249,9 @@ smm_asset_connection_timeouts_set (smm_connection connection, long connect_secs,
     }
 }
 
+static void smm_asset_set_error (smm_asset asset, smm_error_code code, const char *fmt, ...)
+    __attribute__ ((format (printf, 3, 4)));
+
 static void
 smm_asset_set_error (smm_asset asset, smm_error_code code, const char *fmt, ...)
 {
@@ -294,6 +297,9 @@ smm_asset_get_last_error (smm_asset asset, char *message, size_t message_len)
     pthread_mutex_unlock (&asset->lock);
     return code;
 }
+
+static void smm_search_set_error (smm_search search, smm_error_code code, const char *fmt, ...)
+    __attribute__ ((format (printf, 3, 4)));
 
 static void
 smm_search_set_error (smm_search search, smm_error_code code, const char *fmt, ...)
