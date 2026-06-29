@@ -1363,6 +1363,19 @@ START_TEST (test_https_upgrade_already_https)
 }
 END_TEST
 
+START_TEST (test_try_https_upgrade_preserves_port)
+{
+    /* The upgrade only fires on an exact authority match, and it must carry a
+     * non-default port through to the https host rather than silently dropping
+     * it (which would point later requests at port 443). */
+    smm_connection conn = smm_asset_connect ("http://example.com:8080", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_connection_try_https_upgrade (conn, "https://example.com:8080/accounts/login/"), true);
+    ck_assert_str_eq (conn->host, "https://example.com:8080");
+    smm_connection_close (conn);
+}
+END_TEST
+
 /* Minimal single-purpose HTTP server for the eager-login upgrade test: the
  * first connection is answered with a same-host https 301 (carrying an HTML
  * body, as proxies do); the second connection — the upgraded retry, which
@@ -2188,6 +2201,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_try_https_upgrade_switches_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_rejects_other_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_null_args);
+    tcase_add_test (tc_conn, test_try_https_upgrade_preserves_port);
     tcase_add_test (tc_conn, test_eager_login_follows_https_upgrade);
     tcase_add_test (tc_conn, test_successful_request_sets_connected);
     tcase_add_test (tc_conn, test_state_for_curl_error_http_error_keeps_state);
