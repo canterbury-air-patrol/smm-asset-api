@@ -27,12 +27,22 @@
 #include <stdint.h>
 
 /**
- * Library version. Keep in sync with the package version in configure.ac.
+ * Library version. These three numbers are the single source of truth for the
+ * version: configure.ac derives the package version from them, and
+ * SMM_VERSION_STRING / SMM_VERSION_NUMBER below are composed from them, so the
+ * forms cannot drift apart. Bump these on a release.
  */
 #define SMM_VERSION_MAJOR 1
 #define SMM_VERSION_MINOR 1
 #define SMM_VERSION_PATCH 0
-#define SMM_VERSION_STRING "1.1.0"
+
+/* Compose "major.minor.patch" from the numbers above (two-step expansion so the
+ * macro values, not their names, are stringified). */
+#define SMM_VERSION_STRINGIFY_(x) #x
+#define SMM_VERSION_STRINGIFY(x) SMM_VERSION_STRINGIFY_ (x)
+#define SMM_VERSION_STRING                                                                                             \
+    SMM_VERSION_STRINGIFY (SMM_VERSION_MAJOR)                                                                          \
+    "." SMM_VERSION_STRINGIFY (SMM_VERSION_MINOR) "." SMM_VERSION_STRINGIFY (SMM_VERSION_PATCH)
 
 /**
  * Numeric library version: (major << 16) | (minor << 8) | patch.

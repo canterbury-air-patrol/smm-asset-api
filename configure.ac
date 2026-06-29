@@ -1,4 +1,12 @@
-AC_INIT([libsmm-asset], [1.1.0])
+dnl Derive the package version from the single source of truth in the public
+dnl header, so configure.ac and src/smm-asset.h can never disagree.
+m4_define([smm_ver_major],
+  m4_esyscmd_s([sed -n 's/^#define SMM_VERSION_MAJOR \([0-9][0-9]*\).*/\1/p' src/smm-asset.h]))
+m4_define([smm_ver_minor],
+  m4_esyscmd_s([sed -n 's/^#define SMM_VERSION_MINOR \([0-9][0-9]*\).*/\1/p' src/smm-asset.h]))
+m4_define([smm_ver_patch],
+  m4_esyscmd_s([sed -n 's/^#define SMM_VERSION_PATCH \([0-9][0-9]*\).*/\1/p' src/smm-asset.h]))
+AC_INIT([libsmm-asset], [smm_ver_major.smm_ver_minor.smm_ver_patch])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
 AC_CONFIG_HEADERS([config.h])

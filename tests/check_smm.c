@@ -1916,6 +1916,18 @@ START_TEST (test_version_runtime_matches_headers)
 }
 END_TEST
 
+START_TEST (test_version_string_composed_from_components)
+{
+    /* SMM_VERSION_STRING is now derived from the numeric components by
+     * preprocessor stringification; check it matches an independently composed
+     * "major.minor.patch" so the derivation can never silently produce a
+     * malformed string. */
+    char expected[32];
+    snprintf (expected, sizeof (expected), "%d.%d.%d", SMM_VERSION_MAJOR, SMM_VERSION_MINOR, SMM_VERSION_PATCH);
+    ck_assert_str_eq (SMM_VERSION_STRING, expected);
+}
+END_TEST
+
 START_TEST (test_connection_login_fields_initialised)
 {
     smm_connection conn = smm_asset_connect ("not a url", "user", "pass");
@@ -2144,6 +2156,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_connect_only_slashes_is_invalid);
     tcase_add_test (tc_conn, test_debugging_set);
     tcase_add_test (tc_conn, test_version_runtime_matches_headers);
+    tcase_add_test (tc_conn, test_version_string_composed_from_components);
     suite_add_tcase (s, tc_conn);
 
     TCase *tc_position = tcase_create ("Position");
