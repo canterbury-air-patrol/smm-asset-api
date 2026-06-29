@@ -36,6 +36,7 @@ enum http_return_codes
     HTTP_MOVED_PERMANENTLY = 301,
     HTTP_FOUND = 302,
     HTTP_SEE_OTHER = 303,
+    HTTP_FORBIDDEN = 403,
     HTTP_NOT_FOUND = 404,
 };
 

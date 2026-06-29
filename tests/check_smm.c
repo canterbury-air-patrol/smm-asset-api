@@ -1537,6 +1537,152 @@ START_TEST (test_successful_request_sets_connected)
 }
 END_TEST
 
+/* Drives the CSRF-403 re-auth flow over four sequential connections:
+ *   1. the initial POST            -> 403 (CSRF rejected)
+ *   2. the login-page GET          -> 200 with a csrfmiddlewaretoken form
+ *   3. the login POST              -> 302 (login succeeds)
+ *   4. the retried POST            -> retry_status (200 happy path, or 403 to
+ *                                     prove the re-auth is bounded to one try)
+ * Each response sets Connection: close, so every request is a fresh accept. */
+struct csrf_server_s
+{
+    int listen_fd;
+    long retry_status;
+};
+
+static void *
+csrf_retry_server_thread (void *arg)
+{
+    struct csrf_server_s *srv = (struct csrf_server_s *)arg;
+    static const char login_html[] = "<html><body><form method=\"post\">"
+                                     "<input type=\"hidden\" name=\"csrfmiddlewaretoken\" value=\"tok123abc\">"
+                                     "</form></body></html>";
+    for (int step = 0; step < 4; step++)
+    {
+        int fd = accept (srv->listen_fd, NULL, NULL);
+        if (fd < 0)
+        {
+            break;
+        }
+        char req[2048];
+        (void)!read (fd, req, sizeof (req));
+        char resp[1024];
+        int n = 0;
+        switch (step)
+        {
+            case 0: /* initial POST: CSRF rejected */
+                n = snprintf (resp, sizeof (resp),
+                              "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\n"
+                              "Content-Length: 0\r\nConnection: close\r\n\r\n");
+                break;
+            case 1: /* login page with the CSRF token */
+                n = snprintf (resp, sizeof (resp),
+                              "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
+                              "Set-Cookie: csrftoken=tok123abc; Path=/\r\n"
+                              "Content-Length: %zu\r\nConnection: close\r\n\r\n%s",
+                              sizeof (login_html) - 1, login_html);
+                break;
+            case 2: /* login POST succeeds (Django answers 302) */
+                n = snprintf (resp, sizeof (resp),
+                              "HTTP/1.1 302 Found\r\nLocation: /\r\n"
+                              "Set-Cookie: csrftoken=tok123abc; Path=/\r\n"
+                              "Content-Length: 0\r\nConnection: close\r\n\r\n");
+                break;
+            default: /* the retried POST */
+                if (srv->retry_status == 200)
+                {
+                    n = snprintf (resp, sizeof (resp),
+                                  "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                                  "Content-Length: 2\r\nConnection: close\r\n\r\n{}");
+                }
+                else
+                {
+                    n = snprintf (resp, sizeof (resp),
+                                  "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\n"
+                                  "Content-Length: 0\r\nConnection: close\r\n\r\n");
+                }
+                break;
+        }
+        (void)!write (fd, resp, (size_t)n);
+        close (fd);
+    }
+    return NULL;
+}
+
+static smm_connection
+csrf_server_start (struct csrf_server_s *srv, pthread_t *thread, long retry_status)
+{
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+
+    srv->retry_status = retry_status;
+    srv->listen_fd = socket (AF_INET, SOCK_STREAM, 0);
+    ck_assert_int_ge (srv->listen_fd, 0);
+    memset (&addr, 0, sizeof (addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    addr.sin_port = 0; /* ephemeral */
+    ck_assert_int_eq (bind (srv->listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
+    ck_assert_int_eq (listen (srv->listen_fd, 4), 0);
+    ck_assert_int_eq (getsockname (srv->listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
+    uint16_t port = ntohs (addr.sin_port);
+
+    ck_assert_int_eq (pthread_create (thread, NULL, csrf_retry_server_thread, srv), 0);
+
+    char host[64];
+    snprintf (host, sizeof (host), "http://127.0.0.1:%u", port);
+    smm_connection conn = smm_asset_connect (host, "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    return conn;
+}
+
+START_TEST (test_post_403_triggers_reauth_and_retry)
+{
+    struct csrf_server_s srv;
+    pthread_t thread;
+    smm_connection conn = csrf_server_start (&srv, &thread, 200);
+
+    /* The first POST is rejected with 403; the library must re-authenticate
+     * and retry, and the retried POST (now carrying the refreshed token)
+     * succeeds. */
+    struct buffer_s buf = { NULL, 0 };
+    struct smm_curl_res_s *res
+        = smm_connection_curl_retrieve_url (conn, "/data/assets/1/position/add/", "lat=0.0&lon=0.0", &buf, false);
+    ck_assert_ptr_nonnull (res);
+    ck_assert_int_eq (res->success, true);
+    ck_assert_int_eq (res->httpcode, 200);
+
+    smm_curl_res_free (res);
+    free (buf.data);
+    pthread_join (thread, NULL);
+    close (srv.listen_fd);
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_post_403_reauth_is_bounded)
+{
+    struct csrf_server_s srv;
+    pthread_t thread;
+    smm_connection conn = csrf_server_start (&srv, &thread, 403);
+
+    /* Re-auth succeeds but the retried POST is still 403 (e.g. a genuine
+     * permission denial). The library must not loop: it re-authenticates once,
+     * then surfaces the 403 rather than retrying forever. */
+    struct buffer_s buf = { NULL, 0 };
+    struct smm_curl_res_s *res
+        = smm_connection_curl_retrieve_url (conn, "/data/assets/1/position/add/", "lat=0.0&lon=0.0", &buf, false);
+    ck_assert_ptr_nonnull (res);
+    ck_assert_int_eq (res->httpcode, 403);
+
+    smm_curl_res_free (res);
+    free (buf.data);
+    pthread_join (thread, NULL);
+    close (srv.listen_fd);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_curl_retrieve_url_r_returns_null_on_no_response)
 {
     /* Exercises the httpcode==0 cleanup path in smm_connection_curl_retrieve_url_r.
@@ -2204,6 +2350,8 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_try_https_upgrade_preserves_port);
     tcase_add_test (tc_conn, test_eager_login_follows_https_upgrade);
     tcase_add_test (tc_conn, test_successful_request_sets_connected);
+    tcase_add_test (tc_conn, test_post_403_triggers_reauth_and_retry);
+    tcase_add_test (tc_conn, test_post_403_reauth_is_bounded);
     tcase_add_test (tc_conn, test_state_for_curl_error_http_error_keeps_state);
     tcase_add_test (tc_conn, test_state_for_curl_error_connection_failures);
     tcase_add_test (tc_conn, test_invalid_host);
