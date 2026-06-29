@@ -1092,40 +1092,6 @@ START_TEST (test_search_action_sets_search_error_not_conn)
 }
 END_TEST
 
-START_TEST (test_url_path_safe_valid)
-{
-    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/"), true);
-    ck_assert_int_eq (smm_url_path_is_safe ("/search/42/begin/"), true);
-    ck_assert_int_eq (smm_url_path_is_safe ("/"), true);
-}
-END_TEST
-
-START_TEST (test_url_path_safe_dotdot)
-{
-    ck_assert_int_eq (smm_url_path_is_safe ("/search/1/../../admin/"), false);
-    ck_assert_int_eq (smm_url_path_is_safe ("/.."), false);
-}
-END_TEST
-
-START_TEST (test_url_path_safe_query) { ck_assert_int_eq (smm_url_path_is_safe ("/search/1/?injected=evil"), false); }
-END_TEST
-
-START_TEST (test_url_path_safe_fragment) { ck_assert_int_eq (smm_url_path_is_safe ("/search/1/#frag"), false); }
-END_TEST
-
-START_TEST (test_url_path_safe_encoded) { ck_assert_int_eq (smm_url_path_is_safe ("/search/%2e%2e/admin/"), false); }
-END_TEST
-
-START_TEST (test_url_path_safe_absolute)
-{
-    ck_assert_int_eq (smm_url_path_is_safe ("http://example.com/search/1/"), false);
-    ck_assert_int_eq (smm_url_path_is_safe ("https://example.com/search/1/"), false);
-}
-END_TEST
-
-START_TEST (test_url_path_safe_null) { ck_assert_int_eq (smm_url_path_is_safe (NULL), false); }
-END_TEST
-
 START_TEST (test_to_buffer_accumulates)
 {
     struct buffer_s buf = { NULL, 0 };
@@ -2271,16 +2237,6 @@ smm_suite (void)
     tcase_add_test (tc_search, test_search_from_response_valid_returns_search);
     tcase_add_test (tc_search, test_search_from_response_server_error_sets_server);
     suite_add_tcase (s, tc_search);
-
-    TCase *tc_url = tcase_create ("URL");
-    tcase_add_test (tc_url, test_url_path_safe_valid);
-    tcase_add_test (tc_url, test_url_path_safe_dotdot);
-    tcase_add_test (tc_url, test_url_path_safe_query);
-    tcase_add_test (tc_url, test_url_path_safe_fragment);
-    tcase_add_test (tc_url, test_url_path_safe_encoded);
-    tcase_add_test (tc_url, test_url_path_safe_absolute);
-    tcase_add_test (tc_url, test_url_path_safe_null);
-    suite_add_tcase (s, tc_url);
 
     TCase *tc_buffer = tcase_create ("Buffer");
     tcase_add_test (tc_buffer, test_to_buffer_accumulates);

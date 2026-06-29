@@ -215,11 +215,6 @@ bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_re
  * Acquires conn->lock internally; callers must not hold conn->lock. */
 bool smm_connection_try_https_upgrade (smm_connection conn, const char *redirect_url);
 
-/* Returns true if url is a safe relative path: starts with '/', contains
- * no '..' segments, no query ('?'), no fragment ('#'), and no percent-
- * encoded characters ('%'). */
-bool smm_url_path_is_safe (const char *url);
-
 /* Returns true if content_type is the application/json media type, ignoring
  * ASCII case, leading whitespace, and any parameters (e.g. "; charset=utf-8").
  * A NULL content_type returns false. */
