@@ -1,3 +1,26 @@
+libsmm-asset 1.1.0
+==================
+
+New API and hardening release; fully backwards compatible with 1.0.0
+(SONAME libsmmasset.so.0 unchanged).
+
+ * New smm_asset_connection_timeouts_set() lets callers override the
+   per-connection libcurl connect and transfer timeouts.
+ * Position reports are now submitted via POST with a CSRF token, matching
+   the current Search Management Map API, instead of an interpreted GET URL.
+ * Stricter, fail-closed input validation: asset and search ids must be
+   positive, GOTO and outbound positions and search coordinates must be
+   fresh and within range, and search object_url paths must match
+   /search/<id>/. Malformed or empty route geometry is now rejected when
+   parsing waypoints.
+ * get_search() reports parse and protocol errors and distinguishes a 404
+   "no search" result instead of failing silently.
+ * Hardened HTTP handling: reject non-http(s) URL schemes in
+   smm_asset_connect(), guard the libcurl write callbacks against
+   size * nmemb overflow, cap login-page buffering at SMM_MAX_RESPONSE_BYTES,
+   and initialize libcurl global state exactly once via pthread_once.
+ * Fixed a connection reference leak when smm_asset_create() fails.
+
 libsmm-asset 1.0.0
 ==================
 

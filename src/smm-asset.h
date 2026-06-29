@@ -30,9 +30,9 @@
  * Library version. Keep in sync with the package version in configure.ac.
  */
 #define SMM_VERSION_MAJOR 1
-#define SMM_VERSION_MINOR 0
+#define SMM_VERSION_MINOR 1
 #define SMM_VERSION_PATCH 0
-#define SMM_VERSION_STRING "1.0.0"
+#define SMM_VERSION_STRING "1.1.0"
 
 /**
  * Numeric library version: (major << 16) | (minor << 8) | patch.
