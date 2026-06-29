@@ -911,5 +911,19 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
         }
     }
 
+    /* A successful 200 from a real API endpoint means the session is good: the
+     * server answered the request rather than redirecting us to the login
+     * page. Reflect that in the connection state, which otherwise stays NEW
+     * when the first request happens to succeed without a login round-trip
+     * (e.g. cookies already valid on the shared handle). The login-page fetch
+     * itself uses the raw _r path, so it never reaches here and cannot flip the
+     * state to CONNECTED before authentication actually completes. */
+    if (res != NULL && res->success && res->httpcode == HTTP_SUCCESS)
+    {
+        pthread_mutex_lock (&conn->lock);
+        conn->state = SMM_CONNECTION_CONNECTED;
+        pthread_mutex_unlock (&conn->lock);
+    }
+
     return res;
 }
