@@ -1,0 +1,15 @@
+# LeakSanitizer suppressions for the sanitizer CI job.
+#
+# These target one-time initialisation in third-party libraries that the test
+# process never tears down, so leak detection stays meaningful for libsmm-asset
+# itself without failing on allocations we do not own.
+#
+# Note: libsmm-asset deliberately never calls curl_global_cleanup() (see
+# smm_curl_global_init in src/smm-asset-curl.c) because, as a shared library, it
+# cannot know when the host application is finished with libcurl. The libcurl
+# global state is therefore expected to remain allocated at exit.
+leak:libcurl
+leak:libcrypto
+leak:libssl
+leak:libtidy
+leak:curl_global_init

@@ -14,4 +14,4 @@ integration_test_CFLAGS = -I$(top_srcdir)/src
 integration_test_LDADD = $(top_builddir)/src/libsmmasset.la
 endif
 
-EXTRA_DIST = docker-compose.yml provision.sh
+EXTRA_DIST = docker-compose.yml provision.sh lsan.supp
