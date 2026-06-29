@@ -1162,6 +1162,33 @@ START_TEST (test_buffer_reset_null_safe)
 }
 END_TEST
 
+START_TEST (test_secure_clear_zeroes)
+{
+    char *s = strdup ("s3cr3t-password");
+    ck_assert_ptr_nonnull (s);
+    size_t len = strlen (s);
+    smm_secure_clear (s);
+    for (size_t i = 0; i < len; i++)
+    {
+        ck_assert_int_eq (s[i], '\0');
+    }
+    free (s);
+}
+END_TEST
+
+START_TEST (test_secure_clear_empty_string)
+{
+    char *s = strdup ("");
+    ck_assert_ptr_nonnull (s);
+    smm_secure_clear (s); /* nothing to clear, must not over-write */
+    ck_assert_int_eq (s[0], '\0');
+    free (s);
+}
+END_TEST
+
+START_TEST (test_secure_clear_null_safe) { smm_secure_clear (NULL); /* must not crash */ }
+END_TEST
+
 START_TEST (test_content_type_is_json_plain) { ck_assert_int_eq (smm_content_type_is_json ("application/json"), true); }
 END_TEST
 
@@ -2246,6 +2273,12 @@ smm_suite (void)
     tcase_add_test (tc_buffer, test_buffer_reset_discards_content);
     tcase_add_test (tc_buffer, test_buffer_reset_null_safe);
     suite_add_tcase (s, tc_buffer);
+
+    TCase *tc_secure = tcase_create ("SecureClear");
+    tcase_add_test (tc_secure, test_secure_clear_zeroes);
+    tcase_add_test (tc_secure, test_secure_clear_empty_string);
+    tcase_add_test (tc_secure, test_secure_clear_null_safe);
+    suite_add_tcase (s, tc_secure);
 
     TCase *tc_content_type = tcase_create ("ContentType");
     tcase_add_test (tc_content_type, test_content_type_is_json_plain);

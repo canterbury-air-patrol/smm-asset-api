@@ -20,8 +20,10 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-#include "smm-asset.h"
+#include "config.h"
+
 #include "smm-asset-internal.h"
+#include "smm-asset.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -35,6 +37,26 @@
 #include <jansson.h>
 
 _Atomic bool smm_debug = false;
+
+void
+smm_secure_clear (char *s)
+{
+    if (s == NULL)
+    {
+        return;
+    }
+#ifdef HAVE_EXPLICIT_BZERO
+    explicit_bzero (s, strlen (s));
+#else
+    /* Fallback: write through a volatile pointer so the compiler cannot elide
+     * the scrub as a dead store to soon-to-be-freed memory. */
+    volatile char *p = (volatile char *)s;
+    for (size_t n = strlen (s); n > 0; n--)
+    {
+        *p++ = '\0';
+    }
+#endif
+}
 
 /*
  * SMM expects coordinates in URLs formatted with '.' as the decimal separator.
@@ -416,8 +438,13 @@ smm_connection_unref (smm_connection connection)
     {
         pthread_mutex_unlock (&connection->lock);
         free (connection->host);
+        /* Scrub the credentials and session token from memory before freeing,
+         * so they do not linger in the heap after the connection is closed. */
+        smm_secure_clear (connection->user);
         free (connection->user);
+        smm_secure_clear (connection->pass);
         free (connection->pass);
+        smm_secure_clear (connection->csrfmiddlewaretoken);
         free (connection->csrfmiddlewaretoken);
         smm_connection_share_destroy (connection);
         pthread_cond_destroy (&connection->login_cond);

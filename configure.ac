@@ -30,6 +30,11 @@ AM_CONDITIONAL([INTEGRATION_TESTS], [test "x$enable_integration_tests" = "xyes"]
 AC_CHECK_HEADERS([tidy.h],[],[
 AC_CHECK_HEADERS([tidy/tidy.h])])
 
+# explicit_bzero (glibc/BSD) scrubs secrets without the compiler optimising the
+# store away. Where it is unavailable, smm_secure_clear falls back to a
+# volatile write loop.
+AC_CHECK_FUNCS([explicit_bzero])
+
 AC_CONFIG_FILES([Makefile
 	src/Makefile
 	tests/Makefile
