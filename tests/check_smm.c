@@ -1453,6 +1453,77 @@ START_TEST (test_eager_login_follows_https_upgrade)
 }
 END_TEST
 
+/* One-shot server that answers the first request with a 200 and a tiny JSON
+ * body, used to check that a successful API request marks the connection
+ * CONNECTED. */
+static void *
+ok_200_server_thread (void *arg)
+{
+    struct redirect_server_s *srv = (struct redirect_server_s *)arg;
+    int fd = accept (srv->listen_fd, NULL, NULL);
+    if (fd >= 0)
+    {
+        char req[1024];
+        (void)!read (fd, req, sizeof (req));
+        const char body[] = "{}";
+        char resp[256];
+        int n = snprintf (resp, sizeof (resp),
+                          "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: application/json\r\n"
+                          "Content-Length: %zu\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s",
+                          sizeof (body) - 1, body);
+        (void)!write (fd, resp, (size_t)n);
+        close (fd);
+    }
+    return NULL;
+}
+
+START_TEST (test_successful_request_sets_connected)
+{
+    struct redirect_server_s srv;
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+
+    srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
+    ck_assert_int_ge (srv.listen_fd, 0);
+    memset (&addr, 0, sizeof (addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    addr.sin_port = 0; /* ephemeral */
+    ck_assert_int_eq (bind (srv.listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
+    ck_assert_int_eq (listen (srv.listen_fd, 1), 0);
+    ck_assert_int_eq (getsockname (srv.listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
+    srv.port = ntohs (addr.sin_port);
+
+    pthread_t thread;
+    ck_assert_int_eq (pthread_create (&thread, NULL, ok_200_server_thread, &srv), 0);
+
+    char host[64];
+    snprintf (host, sizeof (host), "http://127.0.0.1:%u", srv.port);
+    smm_connection conn = smm_asset_connect (host, "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    /* Freshly connected: state is NEW until a request succeeds. */
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_NEW);
+
+    struct buffer_s buf = { NULL, 0 };
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (conn, "/assets/", NULL, &buf, true);
+    ck_assert_ptr_nonnull (res);
+    ck_assert_int_eq (res->success, true);
+    ck_assert_int_eq (res->httpcode, 200);
+    /* The successful request must have transitioned the state to CONNECTED. */
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_CONNECTED);
+
+    smm_curl_res_free (res);
+    free (buf.data);
+    pthread_join (thread, NULL);
+    close (srv.listen_fd);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_curl_retrieve_url_r_returns_null_on_no_response)
 {
     /* Exercises the httpcode==0 cleanup path in smm_connection_curl_retrieve_url_r.
@@ -2118,6 +2189,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_try_https_upgrade_rejects_other_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_eager_login_follows_https_upgrade);
+    tcase_add_test (tc_conn, test_successful_request_sets_connected);
     tcase_add_test (tc_conn, test_state_for_curl_error_http_error_keeps_state);
     tcase_add_test (tc_conn, test_state_for_curl_error_connection_failures);
     tcase_add_test (tc_conn, test_invalid_host);
