@@ -149,6 +149,12 @@ bool smm_curl_global_init (void);
 bool smm_connection_share_init (smm_connection conn);
 void smm_connection_share_destroy (smm_connection conn);
 
+/* Overwrite a NUL-terminated string in place with zero bytes (up to its
+ * terminator) before it is freed, so secrets do not linger in the heap. Uses
+ * explicit_bzero where available, otherwise a volatile write loop the compiler
+ * cannot elide. NULL-safe. Exposed for testing. */
+void smm_secure_clear (char *s);
+
 void smm_connection_ref (smm_connection conn);
 void smm_connection_unref (smm_connection conn);
 void smm_connection_set_error (smm_connection conn, smm_error_code code, const char *fmt, ...)
