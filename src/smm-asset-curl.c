@@ -869,6 +869,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
 {
     bool retry = true;
     int retries = 0;
+    bool csrf_retried = false;
     struct smm_curl_res_s *res
         = smm_connection_curl_retrieve_url_r (conn, path, post_data, buf ? to_buffer : NULL, buf, json);
 
@@ -898,6 +899,22 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
             if (!retry)
             {
                 DEBUG ("Redirected to %s\n", res->redirect_url);
+            }
+        }
+        else if (post_data != NULL && res->httpcode == HTTP_FORBIDDEN && !csrf_retried)
+        {
+            /* Django answers a CSRF failure with 403, not a login redirect.
+             * The usual cause is a CSRF token that has gone stale (e.g. the
+             * server rotated it since this session's token was captured), so
+             * re-authenticate once to refresh it and retry the POST; the retry
+             * re-reads the freshly rotated token. Bounded to a single attempt
+             * (csrf_retried) so a genuine permission denial, which a re-login
+             * cannot fix, does not loop. */
+            csrf_retried = true;
+            DEBUG ("403 on POST to %s; refreshing session and retrying once\n", path);
+            if (smm_asset_connection_login (conn))
+            {
+                retry = true;
             }
         }
         if (retry && retries < 3)
