@@ -375,6 +375,11 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
 
     if (asprintf (&res->full_uri, "%s%s", conn->host, path) < 0)
     {
+        /* POSIX leaves *strp undefined on asprintf failure; null it so the
+         * unconditional free in smm_curl_res_free cannot touch an
+         * indeterminate pointer (calloc zeroed it, but do not rely on the
+         * call having left it untouched). */
+        res->full_uri = NULL;
         pthread_mutex_unlock (&conn->lock);
         DEBUG ("failed to allocate full_uri");
         goto out;
