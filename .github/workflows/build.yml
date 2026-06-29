@@ -26,6 +26,42 @@ jobs:
     - name: make distcheck
       run: make distcheck
 
+  # Dynamic analysis: build the library and unit tests with AddressSanitizer
+  # and UndefinedBehaviorSanitizer and run the suite under them. This catches
+  # memory errors (overflows, use-after-free) and undefined behaviour that the
+  # static gates cannot see. -fno-sanitize-recover=all turns every finding into
+  # a hard failure rather than a logged warning.
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install Deps
+      run: sudo apt update && sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev check locales-all
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: |
+        ./configure \
+          CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -g -O1" \
+          LDFLAGS="-fsanitize=address,undefined"
+    - name: make
+      run: make
+    # CK_FORK=no runs the suite in a single process so LeakSanitizer reports
+    # once at exit with clean attribution. Known third-party init allocations
+    # (libcurl/OpenSSL/tidy, and the deliberately un-cleaned libcurl global
+    # state) are filtered by tests/lsan.supp; the suppressions path must be
+    # absolute because the test binary runs from the tests/ directory.
+    - name: make check (asan+ubsan)
+      run: |
+        ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 \
+        LSAN_OPTIONS=suppressions=$(pwd)/tests/lsan.supp \
+        UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+        CK_FORK=no \
+        make check
+    - name: Show test log on failure
+      if: failure()
+      run: cat tests/test-suite.log 2>/dev/null || true
+
   # The Docker integration stack depends on an external SMM image and a live
   # database, so it is kept in its own job: a flaky or unhealthy external
   # service fails only this job, not the unit tests, distcheck, or static
