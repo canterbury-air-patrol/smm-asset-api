@@ -1683,6 +1683,108 @@ START_TEST (test_post_403_reauth_is_bounded)
 }
 END_TEST
 
+/* Concurrency exercise for a shared connection. A pool of worker threads issues
+ * requests on the same smm_connection at once, so the shared state touched on
+ * every request -- the libcurl cookie/DNS/TLS share, the connection status, and
+ * the CSRF token tracked from each response's Set-Cookie -- is read and written
+ * concurrently. Functionally every request must succeed; run under
+ * ThreadSanitizer (the dedicated CI job) it also asserts the locking is race
+ * free. */
+#define CONC_THREADS 4
+#define CONC_REQUESTS_PER_THREAD 5
+
+struct conc_server_s
+{
+    int listen_fd;
+    int total; /* exact number of requests to serve, then return */
+};
+
+static void *
+conc_server_thread (void *arg)
+{
+    struct conc_server_s *srv = (struct conc_server_s *)arg;
+    for (int i = 0; i < srv->total; i++)
+    {
+        int fd = accept (srv->listen_fd, NULL, NULL);
+        if (fd < 0)
+        {
+            break;
+        }
+        char req[1024];
+        (void)!read (fd, req, sizeof (req));
+        const char body[] = "{}";
+        char resp[256];
+        int n = snprintf (resp, sizeof (resp),
+                          "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                          "Set-Cookie: csrftoken=tok123abc; Path=/\r\n"
+                          "Content-Length: %zu\r\nConnection: close\r\n\r\n%s",
+                          sizeof (body) - 1, body);
+        (void)!write (fd, resp, (size_t)n);
+        close (fd);
+    }
+    return NULL;
+}
+
+static void *
+conc_worker_thread (void *arg)
+{
+    smm_connection conn = (smm_connection)arg;
+    for (int i = 0; i < CONC_REQUESTS_PER_THREAD; i++)
+    {
+        struct buffer_s buf = { NULL, 0 };
+        struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (conn, "/assets/", NULL, &buf, true);
+        ck_assert_ptr_nonnull (res);
+        ck_assert_int_eq (res->success, true);
+        ck_assert_int_eq (res->httpcode, 200);
+        smm_curl_res_free (res);
+        free (buf.data);
+    }
+    return NULL;
+}
+
+START_TEST (test_concurrent_requests_shared_connection)
+{
+    struct conc_server_s srv;
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+
+    srv.total = CONC_THREADS * CONC_REQUESTS_PER_THREAD;
+    srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
+    ck_assert_int_ge (srv.listen_fd, 0);
+    memset (&addr, 0, sizeof (addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    addr.sin_port = 0; /* ephemeral */
+    ck_assert_int_eq (bind (srv.listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
+    ck_assert_int_eq (listen (srv.listen_fd, CONC_THREADS), 0);
+    ck_assert_int_eq (getsockname (srv.listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
+    uint16_t port = ntohs (addr.sin_port);
+
+    pthread_t server;
+    ck_assert_int_eq (pthread_create (&server, NULL, conc_server_thread, &srv), 0);
+
+    char host[64];
+    snprintf (host, sizeof (host), "http://127.0.0.1:%u", port);
+    smm_connection conn = smm_asset_connect (host, "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+
+    pthread_t workers[CONC_THREADS];
+    for (int i = 0; i < CONC_THREADS; i++)
+    {
+        ck_assert_int_eq (pthread_create (&workers[i], NULL, conc_worker_thread, conn), 0);
+    }
+    for (int i = 0; i < CONC_THREADS; i++)
+    {
+        pthread_join (workers[i], NULL);
+    }
+
+    pthread_join (server, NULL);
+    close (srv.listen_fd);
+    ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_CONNECTED);
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_curl_retrieve_url_r_returns_null_on_no_response)
 {
     /* Exercises the httpcode==0 cleanup path in smm_connection_curl_retrieve_url_r.
@@ -2392,6 +2494,11 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_version_runtime_matches_headers);
     tcase_add_test (tc_conn, test_version_string_composed_from_components);
     suite_add_tcase (s, tc_conn);
+
+    TCase *tc_conc = tcase_create ("Concurrency");
+    tcase_set_timeout (tc_conc, 30);
+    tcase_add_test (tc_conc, test_concurrent_requests_shared_connection);
+    suite_add_tcase (s, tc_conc);
 
     TCase *tc_position = tcase_create ("Position");
     tcase_add_test (tc_position, test_build_position_body_heading);

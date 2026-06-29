@@ -62,6 +62,31 @@ jobs:
       if: failure()
       run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Dynamic analysis for data races: build with ThreadSanitizer and run the
+  # suite, which includes a test driving concurrent requests on one shared
+  # connection. This validates the documented thread-safety contract (the
+  # libcurl cookie/DNS/TLS share, connection state, and CSRF token are touched
+  # under lock from multiple threads). TSan is mutually exclusive with ASan, so
+  # it is a separate job. CK_FORK=no because TSan does not support the
+  # multithreaded-fork model libcheck uses by default.
+  thread-sanitizer:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Install Deps
+      run: sudo apt update && sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev check locales-all
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: ./configure CFLAGS="-fsanitize=thread -g -O1" LDFLAGS="-fsanitize=thread"
+    - name: make
+      run: make
+    - name: make check (tsan)
+      run: CK_FORK=no make check
+    - name: Show test log on failure
+      if: failure()
+      run: cat tests/test-suite.log 2>/dev/null || true
+
   # The Docker integration stack depends on an external SMM image and a live
   # database, so it is kept in its own job: a flaky or unhealthy external
   # service fails only this job, not the unit tests, distcheck, or static
