@@ -893,22 +893,6 @@ smm_content_type_is_json (const char *content_type)
 }
 
 bool
-smm_url_path_is_safe (const char *url)
-{
-    if (url == NULL || url[0] != '/')
-        return false;
-    if (strstr (url, "..") != NULL)
-        return false;
-    if (strchr (url, '?') != NULL)
-        return false;
-    if (strchr (url, '#') != NULL)
-        return false;
-    if (strchr (url, '%') != NULL)
-        return false;
-    return true;
-}
-
-bool
 smm_coords_valid (double lat, double lon)
 {
     /* Reject NaN/infinity outright, then bound to valid WGS84 ranges so a bad
@@ -1372,8 +1356,8 @@ smm_json_number_to_u64 (const json_t *value)
  * documented shape "/search/<positive-id>/" and writes the id to *id_out.
  * Returns false for any other path. Driving the actual request paths from this
  * parsed id (rather than reusing an arbitrary server string) keeps the search
- * API from being pointed at an unintended same-host endpoint, which the generic
- * smm_url_path_is_safe() predicate alone would allow (e.g. /accounts/logout/). */
+ * API from being pointed at an unintended same-host endpoint such as
+ * /accounts/logout/. */
 static bool
 smm_search_parse_object_url (const char *url, long long *id_out)
 {
@@ -1421,9 +1405,9 @@ smm_parse_search_json (smm_asset asset, const char *data, size_t len)
         {
             url = json_string_value (tmp);
         }
-        /* Accept only the documented "/search/<positive-id>/" shape. The
-         * generic smm_url_path_is_safe() predicate is kept for other callers
-         * but is not the trust boundary for search actions. */
+        /* Accept only the documented "/search/<positive-id>/" shape; the
+         * parsed id (not the raw string) is the trust boundary for search
+         * actions. */
         bool url_ok = smm_search_parse_object_url (url, &search_id);
         if (url_ok)
         {
