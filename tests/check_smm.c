@@ -646,6 +646,88 @@ START_TEST (test_search_from_response_server_error_sets_server)
 }
 END_TEST
 
+struct capture_request_server_s
+{
+    int listen_fd;
+    uint16_t port;
+    char request[2048];
+};
+
+static void *
+capture_search_server_thread (void *arg)
+{
+    struct capture_request_server_s *srv = (struct capture_request_server_s *)arg;
+    int fd = accept (srv->listen_fd, NULL, NULL);
+    if (fd >= 0)
+    {
+        ssize_t nread = read (fd, srv->request, sizeof (srv->request) - 1);
+        if (nread > 0)
+        {
+            srv->request[nread] = '\0';
+        }
+        else
+        {
+            srv->request[0] = '\0';
+        }
+
+        const char body[] = "{\"object_url\":\"/search/1/\",\"distance\":10,\"length\":100,\"sweep_width\":50}";
+        char resp[512];
+        int n = snprintf (resp, sizeof (resp),
+                          "HTTP/1.1 200 OK\r\n"
+                          "Content-Type: application/json\r\n"
+                          "Content-Length: %zu\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s",
+                          sizeof (body) - 1, body);
+        (void)!write (fd, resp, (size_t)n);
+        close (fd);
+    }
+    return NULL;
+}
+
+START_TEST (test_get_search_requests_json)
+{
+    struct capture_request_server_s srv;
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+
+    memset (&srv, 0, sizeof (srv));
+    srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
+    ck_assert_int_ge (srv.listen_fd, 0);
+    memset (&addr, 0, sizeof (addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    ck_assert_int_eq (bind (srv.listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
+    ck_assert_int_eq (listen (srv.listen_fd, 1), 0);
+    ck_assert_int_eq (getsockname (srv.listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
+    srv.port = ntohs (addr.sin_port);
+
+    pthread_t thread;
+    ck_assert_int_eq (pthread_create (&thread, NULL, capture_search_server_thread, &srv), 0);
+
+    char host[64];
+    snprintf (host, sizeof (host), "http://127.0.0.1:%u", srv.port);
+    smm_connection conn = smm_asset_connect (host, "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+
+    smm_search search = smm_asset_get_search (asset, -43.5, 172.6);
+    ck_assert_ptr_nonnull (search);
+
+    smm_search_destroy (search);
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+    pthread_join (thread, NULL);
+    close (srv.listen_fd);
+
+    ck_assert_ptr_nonnull (strstr (srv.request, "GET /search/find/closest/"));
+    ck_assert_ptr_nonnull (strstr (srv.request, "Accept: application/json"));
+}
+END_TEST
+
 START_TEST (test_get_search_real_numeric_fields)
 {
     /* The server contract does not guarantee integers; a real-valued
@@ -2656,6 +2738,7 @@ smm_suite (void)
     tcase_add_test (tc_search, test_search_from_response_unsafe_object_url_sets_protocol);
     tcase_add_test (tc_search, test_search_from_response_valid_returns_search);
     tcase_add_test (tc_search, test_search_from_response_server_error_sets_server);
+    tcase_add_test (tc_search, test_get_search_requests_json);
     suite_add_tcase (s, tc_search);
 
     TCase *tc_buffer = tcase_create ("Buffer");

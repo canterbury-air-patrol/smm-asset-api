@@ -1514,7 +1514,7 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     }
     smm_asset_clear_error (asset);
 
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, &buf, false);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, &buf, true);
     free (page);
     if (res == NULL)
     {
