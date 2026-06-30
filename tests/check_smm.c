@@ -9,7 +9,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 START_TEST (test_csrf_extraction)
@@ -1687,18 +1689,28 @@ END_TEST
 
 /* Concurrency exercise for a shared connection. A pool of worker threads issues
  * requests on the same smm_connection at once, so the shared state touched on
- * every request -- the libcurl cookie/DNS/TLS share, the connection status, and
- * the CSRF token tracked from each response's Set-Cookie -- is read and written
+ * every request -- the libcurl cookie share, the connection status, and the
+ * CSRF token tracked from each response's Set-Cookie -- is read and written
  * concurrently. Functionally every request must succeed; run under
  * ThreadSanitizer (the dedicated CI job) it also asserts the locking is race
  * free. */
 #define CONC_THREADS 4
 #define CONC_REQUESTS_PER_THREAD 5
+#define CONC_CONNECT_TIMEOUT_SECS 1L
+#define CONC_TRANSFER_TIMEOUT_SECS 5L
+#define CONC_ACCEPT_TIMEOUT_SECS 5
 
 struct conc_server_s
 {
     int listen_fd;
     int total; /* exact number of requests to serve, then return */
+    int served;
+};
+
+struct conc_worker_s
+{
+    smm_connection conn;
+    unsigned int failures;
 };
 
 static void *
@@ -1707,11 +1719,23 @@ conc_server_thread (void *arg)
     struct conc_server_s *srv = (struct conc_server_s *)arg;
     for (int i = 0; i < srv->total; i++)
     {
+        fd_set read_fds;
+        struct timeval timeout;
+        FD_ZERO (&read_fds);
+        FD_SET (srv->listen_fd, &read_fds);
+        timeout.tv_sec = CONC_ACCEPT_TIMEOUT_SECS;
+        timeout.tv_usec = 0;
+        if (select (srv->listen_fd + 1, &read_fds, NULL, NULL, &timeout) <= 0)
+        {
+            break;
+        }
+
         int fd = accept (srv->listen_fd, NULL, NULL);
         if (fd < 0)
         {
             break;
         }
+        srv->served++;
         char req[1024];
         (void)!read (fd, req, sizeof (req));
         const char body[] = "{}";
@@ -1730,15 +1754,19 @@ conc_server_thread (void *arg)
 static void *
 conc_worker_thread (void *arg)
 {
-    smm_connection conn = (smm_connection)arg;
+    struct conc_worker_s *worker = (struct conc_worker_s *)arg;
     for (int i = 0; i < CONC_REQUESTS_PER_THREAD; i++)
     {
         struct buffer_s buf = { NULL, 0 };
-        struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (conn, "/assets/", NULL, &buf, true);
-        ck_assert_ptr_nonnull (res);
-        ck_assert_int_eq (res->success, true);
-        ck_assert_int_eq (res->httpcode, 200);
-        smm_curl_res_free (res);
+        struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (worker->conn, "/assets/", NULL, &buf, true);
+        if (res == NULL || !res->success || res->httpcode != 200)
+        {
+            worker->failures++;
+        }
+        if (res != NULL)
+        {
+            smm_curl_res_free (res);
+        }
         free (buf.data);
     }
     return NULL;
@@ -1751,6 +1779,7 @@ START_TEST (test_concurrent_requests_shared_connection)
     socklen_t addr_len = sizeof (addr);
 
     srv.total = CONC_THREADS * CONC_REQUESTS_PER_THREAD;
+    srv.served = 0;
     srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
     ck_assert_int_ge (srv.listen_fd, 0);
     memset (&addr, 0, sizeof (addr));
@@ -1769,19 +1798,27 @@ START_TEST (test_concurrent_requests_shared_connection)
     snprintf (host, sizeof (host), "http://127.0.0.1:%u", port);
     smm_connection conn = smm_asset_connect (host, "user", "pass");
     ck_assert_ptr_nonnull (conn);
+    smm_asset_connection_timeouts_set (conn, CONC_CONNECT_TIMEOUT_SECS, CONC_TRANSFER_TIMEOUT_SECS);
 
     pthread_t workers[CONC_THREADS];
+    struct conc_worker_s worker_ctx[CONC_THREADS];
     for (int i = 0; i < CONC_THREADS; i++)
     {
-        ck_assert_int_eq (pthread_create (&workers[i], NULL, conc_worker_thread, conn), 0);
+        worker_ctx[i].conn = conn;
+        worker_ctx[i].failures = 0;
+        ck_assert_int_eq (pthread_create (&workers[i], NULL, conc_worker_thread, &worker_ctx[i]), 0);
     }
+    unsigned int worker_failures = 0;
     for (int i = 0; i < CONC_THREADS; i++)
     {
         pthread_join (workers[i], NULL);
+        worker_failures += worker_ctx[i].failures;
     }
 
     pthread_join (server, NULL);
     close (srv.listen_fd);
+    ck_assert_int_eq (srv.served, srv.total);
+    ck_assert_uint_eq (worker_failures, 0);
     ck_assert_int_eq (smm_asset_connection_get_state (conn), SMM_CONNECTION_CONNECTED);
     smm_connection_close (conn);
 }

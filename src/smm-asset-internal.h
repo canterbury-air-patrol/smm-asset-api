@@ -80,6 +80,7 @@ struct smm_connection_s
     CURLSH *share;
     char *csrfmiddlewaretoken;
     pthread_mutex_t lock;
+    pthread_mutex_t io_lock;
     bool verify_tls;
     /* Per-connection libcurl timeouts in seconds; 0 means use the
      * SMM_CURL_*_TIMEOUT_SECS defaults. Guarded by lock. */

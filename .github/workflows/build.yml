@@ -65,8 +65,8 @@ jobs:
   # Dynamic analysis for data races: build with ThreadSanitizer and run the
   # suite, which includes a test driving concurrent requests on one shared
   # connection. This validates the documented thread-safety contract (the
-  # libcurl cookie/DNS/TLS share, connection state, and CSRF token are touched
-  # under lock from multiple threads). TSan is mutually exclusive with ASan, so
+  # libcurl cookie share, connection state, and CSRF token are touched under
+  # lock from multiple threads). TSan is mutually exclusive with ASan, so
   # it is a separate job. CK_FORK=no because TSan does not support the
   # multithreaded-fork model libcheck uses by default.
   thread-sanitizer:
