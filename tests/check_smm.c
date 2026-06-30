@@ -2,6 +2,7 @@
 #include "smm-asset.h"
 #include <arpa/inet.h>
 #include <check.h>
+#include <errno.h>
 #include <locale.h>
 #include <math.h>
 #include <netinet/in.h>
@@ -653,6 +654,26 @@ struct capture_request_server_s
     char request[2048];
 };
 
+static bool
+write_all (int fd, const char *buf, size_t len)
+{
+    size_t written = 0;
+    while (written < len)
+    {
+        ssize_t nwrite = write (fd, buf + written, len - written);
+        if (nwrite < 0 && errno == EINTR)
+        {
+            continue;
+        }
+        if (nwrite <= 0)
+        {
+            return false;
+        }
+        written += (size_t)nwrite;
+    }
+    return true;
+}
+
 static void *
 capture_search_server_thread (void *arg)
 {
@@ -660,15 +681,26 @@ capture_search_server_thread (void *arg)
     int fd = accept (srv->listen_fd, NULL, NULL);
     if (fd >= 0)
     {
-        ssize_t nread = read (fd, srv->request, sizeof (srv->request) - 1);
-        if (nread > 0)
+        size_t used = 0;
+        while (used + 1 < sizeof (srv->request))
         {
-            srv->request[nread] = '\0';
+            ssize_t nread = read (fd, srv->request + used, sizeof (srv->request) - used - 1);
+            if (nread < 0 && errno == EINTR)
+            {
+                continue;
+            }
+            if (nread <= 0)
+            {
+                break;
+            }
+            used += (size_t)nread;
+            srv->request[used] = '\0';
+            if (strstr (srv->request, "\r\n\r\n") != NULL)
+            {
+                break;
+            }
         }
-        else
-        {
-            srv->request[0] = '\0';
-        }
+        srv->request[used] = '\0';
 
         const char body[] = "{\"object_url\":\"/search/1/\",\"distance\":10,\"length\":100,\"sweep_width\":50}";
         char resp[512];
@@ -680,7 +712,10 @@ capture_search_server_thread (void *arg)
                           "\r\n"
                           "%s",
                           sizeof (body) - 1, body);
-        (void)!write (fd, resp, (size_t)n);
+        if (n > 0 && (size_t)n < sizeof (resp))
+        {
+            (void)!write_all (fd, resp, (size_t)n);
+        }
         close (fd);
     }
     return NULL;

@@ -81,6 +81,12 @@ smm_c_locale_get (void)
     return smm_c_locale;
 }
 
+static bool
+smm_url_part_absent (CURLU *curlu, CURLUPart part, CURLUcode absent_code, char **out)
+{
+    return curl_url_get (curlu, part, out, 0) == absent_code;
+}
+
 /* asprintf() that formats in the private "C" locale (see above), so coordinate
  * conversions use '.' as the decimal separator regardless of the caller's
  * LC_NUMERIC. Returns the asprintf() result; *strp is undefined on failure.
@@ -223,13 +229,16 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
             char *fragment = NULL;
             char *user_part = NULL;
             char *password_part = NULL;
-            bool http_ok = curl_url_get (curlu, CURLUPART_SCHEME, &scheme, 0) == CURLUE_OK && scheme
-                           && (strcmp (scheme, "http") == 0 || strcmp (scheme, "https") == 0)
-                           && curl_url_get (curlu, CURLUPART_HOST, &chost, 0) == CURLUE_OK && chost && chost[0] != '\0'
-                           && curl_url_get (curlu, CURLUPART_QUERY, &query, 0) != CURLUE_OK
-                           && curl_url_get (curlu, CURLUPART_FRAGMENT, &fragment, 0) != CURLUE_OK
-                           && curl_url_get (curlu, CURLUPART_USER, &user_part, 0) != CURLUE_OK
-                           && curl_url_get (curlu, CURLUPART_PASSWORD, &password_part, 0) != CURLUE_OK;
+            bool scheme_ok = curl_url_get (curlu, CURLUPART_SCHEME, &scheme, 0) == CURLUE_OK && scheme
+                             && (strcmp (scheme, "http") == 0 || strcmp (scheme, "https") == 0);
+            bool host_ok = curl_url_get (curlu, CURLUPART_HOST, &chost, 0) == CURLUE_OK && chost && chost[0] != '\0';
+            bool no_query = smm_url_part_absent (curlu, CURLUPART_QUERY, CURLUE_NO_QUERY, &query);
+            bool no_fragment = smm_url_part_absent (curlu, CURLUPART_FRAGMENT, CURLUE_NO_FRAGMENT, &fragment);
+            /* Userinfo can contain a username without a password, or a
+             * password field without a username; reject either form. */
+            bool no_user = smm_url_part_absent (curlu, CURLUPART_USER, CURLUE_NO_USER, &user_part);
+            bool no_password = smm_url_part_absent (curlu, CURLUPART_PASSWORD, CURLUE_NO_PASSWORD, &password_part);
+            bool http_ok = scheme_ok && host_ok && no_query && no_fragment && no_user && no_password;
             conn->state = http_ok ? SMM_CONNECTION_NEW : SMM_CONNECTION_HOST_INVALID;
             curl_free (scheme);
             curl_free (chost);
