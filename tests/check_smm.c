@@ -1540,7 +1540,7 @@ END_TEST
 /* Drives the CSRF-403 re-auth flow over four sequential connections:
  *   1. the initial POST            -> 403 (CSRF rejected)
  *   2. the login-page GET          -> 200 with a csrfmiddlewaretoken form
- *   3. the login POST              -> 302 (login succeeds)
+ *   3. the login POST              -> 302 (login succeeds, CSRF cookie rotates)
  *   4. the retried POST            -> retry_status (200 happy path, or 403 to
  *                                     prove the re-auth is bounded to one try)
  * Each response sets Connection: close, so every request is a fresh accept. */
@@ -1585,7 +1585,7 @@ csrf_retry_server_thread (void *arg)
             case 2: /* login POST succeeds (Django answers 302) */
                 n = snprintf (resp, sizeof (resp),
                               "HTTP/1.1 302 Found\r\nLocation: /\r\n"
-                              "Set-Cookie: csrftoken=tok123abc; Path=/\r\n"
+                              "Set-Cookie: csrftoken=tok456def; Path=/\r\n"
                               "Content-Length: 0\r\nConnection: close\r\n\r\n");
                 break;
             default: /* the retried POST */
@@ -1651,6 +1651,8 @@ START_TEST (test_post_403_triggers_reauth_and_retry)
     ck_assert_ptr_nonnull (res);
     ck_assert_int_eq (res->success, true);
     ck_assert_int_eq (res->httpcode, 200);
+    ck_assert_ptr_nonnull (conn->csrfmiddlewaretoken);
+    ck_assert_str_eq (conn->csrfmiddlewaretoken, "tok456def");
 
     smm_curl_res_free (res);
     free (buf.data);

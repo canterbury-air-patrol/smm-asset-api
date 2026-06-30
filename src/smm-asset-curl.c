@@ -794,13 +794,16 @@ smm_asset_connection_login (smm_connection connection)
 
     smm_buffer_reset (&buf);
 
-    /* Publish the CSRF token, state, and last_error under the lock so that
-     * readers always see a consistent view of all three fields. */
+    /* Publish state and last_error under the lock so readers always see a
+     * consistent view. The raw request path already refreshes
+     * csrfmiddlewaretoken from Set-Cookie after each response; keep that newer
+     * cookie token when present, and use the parsed form token only as a
+     * fallback for servers that do not set a csrftoken cookie. */
     pthread_mutex_lock (&connection->lock);
-    if (csrf_token)
+    if (csrf_token && connection->csrfmiddlewaretoken == NULL)
     {
-        free (connection->csrfmiddlewaretoken);
         connection->csrfmiddlewaretoken = csrf_token;
+        csrf_token = NULL;
     }
     connection->state = new_state;
     switch (new_state)
@@ -832,6 +835,7 @@ smm_asset_connection_login (smm_connection connection)
     pthread_cond_broadcast (&connection->login_cond);
     pthread_mutex_unlock (&connection->lock);
 
+    free (csrf_token);
     return res;
 }
 
