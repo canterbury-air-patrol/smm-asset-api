@@ -68,11 +68,10 @@ typedef enum
  * @section thread_safety Thread-safety guarantees
  *
  * - A single smm_connection may be shared across threads.  The connection's
- *   shared state (cookies, CSRF token, DNS/TLS cache, connection status and
- *   error record) is protected by an internal mutex, so concurrent calls on
- *   the same connection are safe.  Calls are not globally serialised: the
- *   mutex is not held across network I/O, so independent requests on the same
- *   connection may be in flight in parallel.
+ *   shared state (cookies, CSRF token, connection status and error record) is
+ *   protected by internal mutexes, so concurrent calls on the same connection
+ *   are safe. Network I/O is serialised per connection to keep the shared
+ *   cookie jar consistent; use separate connections for parallel transfers.
  *
  * - smm_asset_connect() and smm_connection_close() are safe to call from any
  *   thread, but smm_connection_close() must not be called while another thread

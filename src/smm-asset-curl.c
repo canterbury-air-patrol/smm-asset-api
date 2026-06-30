@@ -90,10 +90,6 @@ smm_connection_share_configure (CURLSH *share, pthread_mutex_t *lock)
         return false;
     if (curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_COOKIE) != CURLSHE_OK)
         return false;
-    if (curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS) != CURLSHE_OK)
-        return false;
-    if (curl_share_setopt (share, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION) != CURLSHE_OK)
-        return false;
     return true;
 }
 
@@ -343,6 +339,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     struct curl_slist *headers = NULL;
     char *csrf_token = NULL;
     bool have_ref = false;
+    bool have_io_lock = false;
 
     /* Never log post_data: for the login request it carries the user's
      * password. Log only whether a body is present. */
@@ -385,6 +382,9 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
         goto out;
     }
     pthread_mutex_unlock (&conn->lock);
+
+    pthread_mutex_lock (&conn->io_lock);
+    have_io_lock = true;
 
     curl = curl_easy_init ();
     if (curl == NULL)
@@ -513,6 +513,10 @@ out:
     if (curl)
     {
         curl_easy_cleanup (curl);
+    }
+    if (have_io_lock)
+    {
+        pthread_mutex_unlock (&conn->io_lock);
     }
     if (have_ref)
     {
