@@ -2,13 +2,20 @@ libsmm-asset (1.1.0) unstable; urgency=medium
 
   * New smm_asset_connection_timeouts_set() for per-connection libcurl
     connect/transfer timeouts (compatible ABI addition; SONAME unchanged).
-  * Report asset position via POST with a CSRF token.
+  * Report asset position via POST with a CSRF token; retry once on a 403
+    by re-authenticating, and preserve the rotated csrftoken cookie.
+  * Request application/json explicitly for closest-search lookups.
+  * Serialise per-connection network I/O to keep the shared cookie jar
+    consistent across threads.
+  * Mark the connection CONNECTED after the first successful request.
   * Stricter input validation for ids, coordinates and search object_url;
-    reject malformed or empty route geometry.
+    reject malformed or empty route geometry; reject host URLs carrying
+    userinfo, query, or fragment components.
   * get_search() reports parse/protocol errors and a 404 no-search result.
+  * Scrub credentials and the session token before freeing the connection.
   * Hardened HTTP handling; see NEWS for the full summary.
 
- -- Scott Parlane <sjp@canterburyairpatrol.org>  Sun, 29 Jun 2026 00:00:00 +0000
+ -- Scott Parlane <sjp@canterburyairpatrol.org>  Mon, 30 Jun 2026 00:00:00 +0000
 
 libsmm-asset (1.0.0) unstable; urgency=medium
 
