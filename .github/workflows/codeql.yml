@@ -57,22 +57,20 @@ jobs:
 
 
     - name: Install depends
-      run: sudo apt install -y libcurl4-openssl-dev libtidy-dev libjansson-dev
+      run: |
+        sudo apt update
+        sudo apt install -y autoconf automake libtool pkg-config \
+          libcurl4-openssl-dev libtidy-dev libjansson-dev check
 
-    # Autobuild attempts to build any compiled languages (C/C++, C#, Go, Java, or Swift).
-    # If this step fails, then you should remove it and run the build manually (see below)
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v4
-
-    # ℹ️ Command-line programs to run using the OS shell.
-    # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-
-    #   If the Autobuild fails above, remove it and uncomment the following three lines.
-    #   modify them (or add more) to build your code if your project, please refer to the EXAMPLE below for guidance.
-
-    # - run: |
-    #     echo "Run, Build Application using script"
-    #     ./location_of_script_within_repo/buildscript.sh
+    # Generated autotools files are not checked in, so CodeQL's generic
+    # autobuild has nothing reliable to invoke from a clean checkout. Build the
+    # project explicitly so CodeQL observes the same compilation as CI.
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: ./configure
+    - name: build
+      run: make
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
