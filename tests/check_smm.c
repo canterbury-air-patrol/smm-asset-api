@@ -1570,6 +1570,34 @@ START_TEST (test_https_upgrade_non_http_http_host)
 }
 END_TEST
 
+START_TEST (test_redirect_is_login_page_matches)
+{
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/accounts/login/"), true);
+    /* Django appends ?next=<original path>. */
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/accounts/login/?next=/assets/"), true);
+    /* A server-configured base path prefixes the login path. */
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/smm/accounts/login/"), true);
+    /* Trailing slash is optional. */
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/accounts/login"), true);
+    ck_assert_int_eq (smm_redirect_is_login_page ("http://example.com:8080/accounts/login/"), true);
+}
+END_TEST
+
+START_TEST (test_redirect_is_login_page_rejects_lookalikes)
+{
+    /* The login path in the query string or fragment is not a login
+     * redirect; only the path component counts. */
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/docs/?highlight=accounts/login"), false);
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/dashboard/?next=/accounts/login/"), false);
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/#accounts/login"), false);
+    /* The match is anchored at a path-segment boundary. */
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/xaccounts/login/"), false);
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/accounts/login2/"), false);
+    ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/accounts/"), false);
+    ck_assert_int_eq (smm_redirect_is_login_page (NULL), false);
+}
+END_TEST
+
 START_TEST (test_try_https_upgrade_switches_host)
 {
     smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
@@ -2772,6 +2800,8 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_https_upgrade_non_http_http_host);
     tcase_add_test (tc_conn, test_https_upgrade_already_https);
+    tcase_add_test (tc_conn, test_redirect_is_login_page_matches);
+    tcase_add_test (tc_conn, test_redirect_is_login_page_rejects_lookalikes);
     tcase_add_test (tc_conn, test_try_https_upgrade_switches_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_drops_explicit_default_port);
     tcase_add_test (tc_conn, test_try_https_upgrade_rejects_other_host);

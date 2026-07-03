@@ -873,6 +873,50 @@ smm_asset_connection_login (smm_connection connection)
 }
 
 bool
+smm_redirect_is_login_page (const char *redirect_url)
+{
+    /* Match on the URL's path component only, so a query string or fragment
+     * that merely mentions the login page (e.g. "?next=/accounts/login/")
+     * cannot masquerade as a login redirect. The path must end in the Django
+     * login page at a segment boundary (the leading '/' in the needle),
+     * tolerating a server-configured base path prefix and a missing trailing
+     * slash. */
+    static const char login_path[] = "/accounts/login";
+    const size_t login_len = sizeof (login_path) - 1;
+
+    if (redirect_url == NULL)
+    {
+        return false;
+    }
+
+    CURLU *curlu = curl_url ();
+    if (curlu == NULL)
+    {
+        return false;
+    }
+
+    bool is_login = false;
+    /* CURLINFO_REDIRECT_URL is always absolute, so a plain parse suffices;
+     * anything unparseable is not a login redirect. */
+    if (curl_url_set (curlu, CURLUPART_URL, redirect_url, 0) == CURLUE_OK)
+    {
+        char *path = NULL;
+        if (curl_url_get (curlu, CURLUPART_PATH, &path, 0) == CURLUE_OK && path)
+        {
+            size_t len = strlen (path);
+            if (len > 0 && path[len - 1] == '/')
+            {
+                len--;
+            }
+            is_login = len >= login_len && strncmp (path + len - login_len, login_path, login_len) == 0;
+            curl_free (path);
+        }
+    }
+    curl_url_cleanup (curlu);
+    return is_login;
+}
+
+bool
 smm_httpcode_is_redirect (long httpcode)
 {
     /* The redirects we follow: 301 (e.g. Django's SECURE_SSL_REDIRECT
@@ -1001,7 +1045,7 @@ smm_connection_curl_retrieve_url (smm_connection conn, const char *path, const c
                 retry = true;
             }
 
-            if (!retry && strstr (res->redirect_url, "accounts/login") != NULL)
+            if (!retry && smm_redirect_is_login_page (res->redirect_url))
             {
                 DEBUG ("Login required\n");
                 if (smm_asset_connection_login (conn))
