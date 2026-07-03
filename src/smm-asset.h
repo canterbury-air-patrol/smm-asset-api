@@ -85,9 +85,9 @@ typedef enum
  * - Each smm_search is owned by a single thread at a time.  Two threads must
  *   not call functions on the same search concurrently.
  *
- * - smm_asset_debugging_set() must be called before any other threads are
- *   started; the smm_debug flag is declared _Atomic but toggling it after
- *   threads are running may produce interleaved debug output.
+ * - smm_asset_debugging_set() may be called from any thread at any time (the
+ *   flag is _Atomic). Debug output goes to stderr; each message is written
+ *   whole, so concurrent threads' messages do not interleave mid-line.
  */
 
 /**

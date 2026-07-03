@@ -51,13 +51,19 @@ enum http_return_codes
 #define SMM_MAX_RESPONSE_BYTES ((size_t)8 * 1024 * 1024)
 
 extern _Atomic bool smm_debug;
+/* Library diagnostics go to stderr: host applications may emit structured
+ * output (pipes, NMEA, JSON) on stdout that interleaved debug lines would
+ * corrupt. The prefix and message are two writes, so hold the stream's stdio
+ * lock across both to keep concurrent threads' lines whole. */
 #define DEBUG(...)                                                                                                     \
     do                                                                                                                 \
     {                                                                                                                  \
         if (smm_debug)                                                                                                 \
         {                                                                                                              \
-            printf ("%s:%i ", __func__, __LINE__);                                                                     \
-            printf (__VA_ARGS__);                                                                                      \
+            flockfile (stderr);                                                                                        \
+            fprintf (stderr, "%s:%i ", __func__, __LINE__);                                                            \
+            fprintf (stderr, __VA_ARGS__);                                                                             \
+            funlockfile (stderr);                                                                                      \
         }                                                                                                              \
     } while (0)
 
