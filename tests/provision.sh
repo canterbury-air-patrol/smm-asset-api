@@ -27,7 +27,12 @@ done
 echo "Provisioning test data..."
 $COMPOSE exec -T smm /code/venv/bin/python manage.py shell <<EOF
 from django.contrib.auth.models import User
+from django.contrib.gis.geos import Point
 from assets.models import Asset, AssetType
+from data.models import GeoTimeLabel
+from mission.models import Mission, MissionAsset, MissionUser
+from search.models import Search, SearchParams
+
 if not User.objects.filter(username='testuser').exists():
     User.objects.create_superuser('testuser', 'test@example.com', 'testpass')
 else:
@@ -36,8 +41,28 @@ else:
     u.save()
 
 # Create a test asset type and asset
+user = User.objects.get(username='testuser')
 at, _ = AssetType.objects.get_or_create(name='Test Drone')
-Asset.objects.get_or_create(name='Test Asset', asset_type=at, owner=User.objects.get(username='testuser'))
+asset, _ = Asset.objects.get_or_create(name='Test Asset', asset_type=at, owner=user)
+
+# An open mission with the user and asset attached: the search endpoints
+# resolve the mission from the asset's MissionAsset record, so without this
+# the asset can never be offered a search.
+mission = Mission.objects.filter(mission_name='Integration Test Mission', closed__isnull=True).first()
+if mission is None:
+    mission = Mission.objects.create(mission_name='Integration Test Mission', creator=user)
+MissionUser.objects.get_or_create(mission=mission, user=user, defaults={'creator': user, 'permissions_admin': True})
+MissionAsset.objects.get_or_create(mission=mission, asset=asset, removed=None, defaults={'creator': user})
+
+# A sector search for the asset's type, centred on the position the
+# integration test reports from, so the get_search -> waypoints -> accept ->
+# complete lifecycle has a search to run. Recreated when a previous run
+# completed (or deleted) the last one, keeping provisioning re-runnable.
+if not Search.objects.filter(mission=mission, completed_at__isnull=True,
+                             deleted_at__isnull=True, replaced_at__isnull=True).exists():
+    datum = GeoTimeLabel.objects.create(geo=Point(172.6, -43.5, srid=4326), created_by=user,
+                                        label='Integration test datum', geo_type='poi', mission=mission)
+    Search.create_sector_search(SearchParams(datum, at, user, 100), save=True)
 EOF
 
 echo "Provisioning complete."
