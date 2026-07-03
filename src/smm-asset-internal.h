@@ -213,6 +213,14 @@ smm_search smm_search_from_response (smm_asset asset, long httpcode, const char 
  * (301, 302, 303). */
 bool smm_httpcode_is_redirect (long httpcode);
 
+/* Returns true if redirect_url's path component ends with the Django login
+ * page ("/accounts/login/", trailing slash optional, base-path prefix
+ * allowed) at a path-segment boundary. Matching on the parsed path — not the
+ * whole URL — keeps a query string or fragment that merely mentions the
+ * login page from being mistaken for a login redirect. NULL or an
+ * unparseable URL returns false. Exposed for testing. */
+bool smm_redirect_is_login_page (const char *redirect_url);
+
 /* Returns true if https_redirect is an HTTPS upgrade of http_host to the
  * same host:port — used to guard against redirect-based downgrade attacks. */
 bool smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect);
