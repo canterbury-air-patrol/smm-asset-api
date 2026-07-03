@@ -763,6 +763,72 @@ START_TEST (test_get_search_requests_json)
 }
 END_TEST
 
+/* Search state changes (begin/finished) are @require_POST on the server: a
+ * GET is answered with 405 and the search can never be accepted. Drive one
+ * action against a capture server and assert the wire format: the POST
+ * request line with asset_id in the query string, the empty body, and the
+ * session's CSRF token presented as a header. */
+static void
+check_search_action_sends_post (bool (*action) (smm_search), const char *expected_request_line)
+{
+    struct capture_request_server_s srv;
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+
+    memset (&srv, 0, sizeof (srv));
+    srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
+    ck_assert_int_ge (srv.listen_fd, 0);
+    memset (&addr, 0, sizeof (addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    ck_assert_int_eq (bind (srv.listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
+    ck_assert_int_eq (listen (srv.listen_fd, 1), 0);
+    ck_assert_int_eq (getsockname (srv.listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
+    srv.port = ntohs (addr.sin_port);
+
+    pthread_t thread;
+    ck_assert_int_eq (pthread_create (&thread, NULL, capture_search_server_thread, &srv), 0);
+
+    char host[64];
+    snprintf (host, sizeof (host), "http://127.0.0.1:%u", srv.port);
+    smm_connection conn = smm_asset_connect (host, "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    /* Simulate an authenticated session so the POST has a token to present. */
+    conn->csrfmiddlewaretoken = strdup ("tok123abc");
+    ck_assert_ptr_nonnull (conn->csrfmiddlewaretoken);
+
+    struct smm_search_s search_s;
+    memset (&search_s, 0, sizeof (search_s));
+    search_s.conn = conn;
+    search_s.asset_id = 7;
+    search_s.search_id = 1;
+
+    ck_assert_int_eq (action (&search_s), true);
+    ck_assert_int_eq (smm_search_get_last_error (&search_s, NULL, 0), SMM_ERROR_NONE);
+
+    pthread_join (thread, NULL);
+    close (srv.listen_fd);
+    smm_connection_close (conn);
+
+    ck_assert_ptr_nonnull (strstr (srv.request, expected_request_line));
+    /* An empty POST body: asset_id travels in the query string. */
+    ck_assert_ptr_nonnull (strstr (srv.request, "Content-Length: 0\r\n"));
+    ck_assert_ptr_nonnull (strstr (srv.request, "X-CSRFToken: tok123abc\r\n"));
+}
+
+START_TEST (test_search_accept_sends_post)
+{
+    check_search_action_sends_post (smm_search_accept, "POST /search/1/begin/?asset_id=7 HTTP/1.1");
+}
+END_TEST
+
+START_TEST (test_search_complete_sends_post)
+{
+    check_search_action_sends_post (smm_search_complete, "POST /search/1/finished/?asset_id=7 HTTP/1.1");
+}
+END_TEST
+
 START_TEST (test_get_search_real_numeric_fields)
 {
     /* The server contract does not guarantee integers; a real-valued
@@ -2804,6 +2870,8 @@ smm_suite (void)
     tcase_add_test (tc_search, test_search_from_response_valid_returns_search);
     tcase_add_test (tc_search, test_search_from_response_server_error_sets_server);
     tcase_add_test (tc_search, test_get_search_requests_json);
+    tcase_add_test (tc_search, test_search_accept_sends_post);
+    tcase_add_test (tc_search, test_search_complete_sends_post);
     suite_add_tcase (s, tc_search);
 
     TCase *tc_buffer = tcase_create ("Buffer");

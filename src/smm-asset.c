@@ -1339,7 +1339,11 @@ smm_search_action (smm_search search, const char *action)
     }
     smm_search_clear_error (search);
 
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, action_page, NULL, &buf, false);
+    /* POST, not GET: search state changes (begin/finished) are @require_POST
+     * on the server since the CSRF hardening that also moved position
+     * reporting to POST.  An empty body is enough -- asset_id rides in the
+     * query string and the view accepts it from GET or POST. */
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, action_page, "", &buf, false);
     if (res == NULL)
     {
         smm_search_set_error (search, SMM_ERROR_NETWORK, "network failure sending %s action", action);
