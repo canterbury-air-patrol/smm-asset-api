@@ -1,3 +1,48 @@
+libsmm-asset 1.1.1
+==================
+
+Bug-fix release; fully backwards compatible with 1.1.0 (SONAME
+libsmmasset.so.0 unchanged, no interface changes).
+
+ * Search begin/finished actions are now sent as POST with asset_id in the
+   request body, matching the current Search Management Map API. Against
+   current servers the old GET was rejected (405/404), so an asset could
+   never accept a search; deployed systems should upgrade.
+ * Fixed a crash on login pages containing a valueless attribute (e.g.
+   "<input name>"): a malformed or hostile login page now degrades to a
+   protocol error instead of a NULL dereference.
+ * The login POST body and escaped credentials are scrubbed before being
+   freed, extending the 1.1.0 credential-scrubbing policy to every heap
+   copy of the password within the library's reach. Transient CSRF/session
+   token copies (cookie rotation, the per-request snapshot and header, and
+   login parsing) get the same treatment, and the scrub-then-free pattern
+   is centralised in an internal helper so a future call site cannot
+   forget the scrub.
+ * The response body buffer is now freed on every network-failure path,
+   closing a narrow leak in get_assets, get_waypoints, and the search
+   actions.
+ * The HTTP->HTTPS upgrade now matches hosts with explicit default ports
+   ("http://host:80" -> "https://host") and compares hostnames
+   case-insensitively (including bracketed IPv6 literals); an explicit :80
+   is dropped from the upgraded host instead of driving TLS at port 80.
+ * The login redirect is detected from the redirect URL's parsed path
+   ("/accounts/login/" at a segment boundary), not a substring match over
+   the whole URL.
+ * Every failure path now records a per-object last_error, and errors are
+   cleared on entry, so smm_asset_get_search()'s documented NULL +
+   SMM_ERROR_NONE "no suitable search" contract holds on all paths (now
+   documented in the header, with the README example updated).
+ * smm_asset_connect() failures are reported one way: NULL only for NULL
+   arguments or allocation failure, otherwise a connection whose state and
+   last_error describe the initialisation failure; such a connection
+   refuses requests instead of driving libcurl unconfigured.
+ * Debug output moved from stdout to stderr and is written whole-line, so
+   concurrent threads' messages no longer interleave and application
+   stdout is never polluted.
+ * The integration suite now drives the full search lifecycle (closest
+   search, waypoints, accept, mid-search position report, complete)
+   against a live SMM stack.
+
 libsmm-asset 1.1.0
 ==================
 

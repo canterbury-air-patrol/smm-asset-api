@@ -1,3 +1,24 @@
+libsmm-asset (1.1.1) unstable; urgency=medium
+
+  * Send search begin/finished as POST with asset_id in the body; the old
+    GET is rejected by current SMM servers, so assets could never accept a
+    search (deployed-system regression fix).
+  * Fix a crash on login pages containing a valueless attribute.
+  * Scrub the login POST body, escaped credentials, and every transient
+    CSRF-token copy before freeing.
+  * Free the response buffer on all network-failure paths.
+  * Match explicit default ports and hostname case in the HTTPS upgrade;
+    drop an explicit :80 from the upgraded host.
+  * Detect the login redirect by parsed path, not URL substring.
+  * Record a last_error on every failure path and clear it on entry;
+    document get_search()'s NULL + SMM_ERROR_NONE no-search contract.
+  * Consistent smm_asset_connect() failure reporting; a connection whose
+    initialisation failed refuses requests.
+  * Debug output goes to stderr, written whole-line.
+  * Integration suite covers the full search lifecycle.
+
+ -- Scott Parlane <sjp@canterburyairpatrol.org>  Thu, 03 Jul 2026 00:00:00 +0000
+
 libsmm-asset (1.1.0) unstable; urgency=medium
 
   * New smm_asset_connection_timeouts_set() for per-connection libcurl
