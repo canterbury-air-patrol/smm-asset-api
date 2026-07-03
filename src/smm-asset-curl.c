@@ -556,20 +556,29 @@ extract_csrfmiddlewaretoken (TidyDoc tdoc, TidyNode tnod, char **token, int dept
             {
                 bool is_csrf = false;
                 ctmbstr value = NULL;
-                /* check the attributes */
+                /* check the attributes. Tidy returns NULL from tidyAttrName
+                 * for a malformed/anonymous attribute and from tidyAttrValue
+                 * for a valueless one (e.g. "<input name>"); both must be
+                 * skipped, not dereferenced — a hostile or broken login page
+                 * must degrade to "no token found", never crash the host. */
                 for (TidyAttr attr = tidyAttrFirst (child); attr; attr = tidyAttrNext (attr))
                 {
                     ctmbstr attrName = tidyAttrName (attr);
+                    ctmbstr attrValue = tidyAttrValue (attr);
+                    if (attrName == NULL || attrValue == NULL)
+                    {
+                        continue;
+                    }
                     if (strcmp (attrName, "name") == 0)
                     {
-                        if (strcmp (tidyAttrValue (attr), "csrfmiddlewaretoken") == 0)
+                        if (strcmp (attrValue, "csrfmiddlewaretoken") == 0)
                         {
                             is_csrf = true;
                         }
                     }
                     else if (strcmp (attrName, "value") == 0)
                     {
-                        value = tidyAttrValue (attr);
+                        value = attrValue;
                     }
                 }
                 if (is_csrf && value)
