@@ -994,6 +994,9 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, i
     {
         return false;
     }
+    /* Clear the error before any fallible step, so no failure path can leave
+     * a stale earlier error visible as this call's result. */
+    smm_asset_clear_error (asset);
     if (!smm_position_inputs_valid (latitude, longitude, heading, fix))
     {
         smm_asset_set_error (asset, SMM_ERROR_INVALID_ARG,
@@ -1008,15 +1011,16 @@ smm_asset_report_position (smm_asset asset, double latitude, double longitude, i
     char *body = smm_asset_build_position_body (latitude, longitude, altitude, heading, fix);
     if (body == NULL)
     {
+        smm_asset_set_error (asset, SMM_ERROR_NETWORK, "failed to build position report request");
         return false;
     }
     char *page = NULL;
     if (asprintf (&page, "/data/assets/%lld/position/add/", asset->asset_id) < 0)
     {
+        smm_asset_set_error (asset, SMM_ERROR_NETWORK, "failed to build position report request");
         free (body);
         return false;
     }
-    smm_asset_clear_error (asset);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, body, &buf, false);
     free (page);
@@ -1333,10 +1337,15 @@ smm_search_action (smm_search search, const char *action)
     char *body = NULL;
     struct buffer_s buf = { NULL, 0 };
 
+    /* Clear the error before any fallible step, so no failure path can leave
+     * a stale earlier error visible as this call's result. */
+    smm_search_clear_error (search);
+
     /* Build the path from the parsed search id, not a server string, so it can
      * only ever be /search/<id>/<action>/. */
     if (asprintf (&action_page, "/search/%lld/%s/", search->search_id, action) < 0)
     {
+        smm_search_set_error (search, SMM_ERROR_NETWORK, "failed to build %s action request", action);
         return false;
     }
     /* POST, not GET: search state changes (begin/finished) are @require_POST
@@ -1346,10 +1355,10 @@ smm_search_action (smm_search search, const char *action)
      * invisible and the action 404s. */
     if (asprintf (&body, "asset_id=%lli", search->asset_id) < 0)
     {
+        smm_search_set_error (search, SMM_ERROR_NETWORK, "failed to build %s action request", action);
         free (action_page);
         return false;
     }
-    smm_search_clear_error (search);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, action_page, body, &buf, false);
     free (action_page);
@@ -1528,6 +1537,11 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
     {
         return NULL;
     }
+    /* Clear the error before any fallible step: a NULL return with the error
+     * left SMM_ERROR_NONE is the documented "no suitable search" outcome, so
+     * every failure path below must record an error, and none may leak a
+     * stale one. */
+    smm_asset_clear_error (asset);
     if (!smm_coords_valid (latitude, longitude))
     {
         smm_asset_set_error (asset, SMM_ERROR_INVALID_ARG, "invalid search coordinates (latitude or longitude)");
@@ -1540,9 +1554,9 @@ smm_asset_get_search (smm_asset asset, double latitude, double longitude)
                                latitude, longitude)
         < 0)
     {
+        smm_asset_set_error (asset, SMM_ERROR_NETWORK, "failed to build closest-search request");
         return NULL;
     }
-    smm_asset_clear_error (asset);
 
     struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (asset->conn, page, NULL, &buf, true);
     free (page);
