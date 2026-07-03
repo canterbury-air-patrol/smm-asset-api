@@ -57,9 +57,10 @@ int main(int argc, char *argv[])
 		/* Report this assets position as 43 deg South, 172 deg East, 35 meters high, heading west, 3d fix */ 
 		smm_asset_report_position (asset, -43, 172, 35, 270, 3);
 
-		/* You can also get a search to conduct. A declined accept (another
-		 * asset may have taken the search first) is retried with a fresh
-		 * lookup, bounded so a persistent decline cannot loop forever. */
+		/* You can also get a search to conduct. A declined acceptance
+		 * (another asset may have taken the search first) is retried with a
+		 * fresh lookup, bounded so that a persistent decline cannot loop
+		 * forever. */
 		smm_search search = NULL;
 		for (int attempt = 0; attempt < 3; attempt++)
 		{
