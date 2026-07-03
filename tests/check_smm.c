@@ -1514,8 +1514,44 @@ END_TEST
 
 START_TEST (test_https_upgrade_different_port)
 {
-    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:80", "https://example.com:443/login/"),
+    /* Genuinely different, non-default ports are not verifiably the same
+     * server; the downgrade guard stays closed. */
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:8080", "https://example.com:8443/login/"),
                       false);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:8080", "https://example.com/login/"), false);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", "https://example.com:8443/login/"), false);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_explicit_default_ports)
+{
+    /* An explicit default port is the same origin as the implied one: the
+     * standard http(80)->https(443) upgrade must match however the defaults
+     * are spelled. */
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:80", "https://example.com/login/"), true);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com", "https://example.com:443/login/"), true);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:80", "https://example.com:443/login/"), true);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_hostname_case_insensitive)
+{
+    /* DNS names are case-insensitive; a server that answers with a
+     * differently-cased canonical name is still the same host. */
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://Example.COM", "https://example.com/login/"), true);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://example.com:8080", "https://EXAMPLE.com:8080/login/"),
+                      true);
+}
+END_TEST
+
+START_TEST (test_https_upgrade_ipv6_literal)
+{
+    /* Bracketed IPv6 literals: the colons inside the brackets are part of
+     * the host, not a port separator. */
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://[::1]:8080", "https://[::1]:8080/login/"), true);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://[::1]", "https://[::1]/login/"), true);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://[::1]", "https://[::2]/login/"), false);
+    ck_assert_int_eq (smm_https_upgrade_is_same_host ("http://[::1]:8080", "https://[::1]:8443/login/"), false);
 }
 END_TEST
 
@@ -1537,6 +1573,19 @@ END_TEST
 START_TEST (test_try_https_upgrade_switches_host)
 {
     smm_connection conn = smm_asset_connect ("http://example.com", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    ck_assert_int_eq (smm_connection_try_https_upgrade (conn, "https://example.com/accounts/login/"), true);
+    ck_assert_str_eq (conn->host, "https://example.com");
+    smm_connection_close (conn);
+}
+END_TEST
+
+START_TEST (test_try_https_upgrade_drops_explicit_default_port)
+{
+    /* The upgraded host adopts the redirect's authority: an explicit :80 on
+     * the http host must not be carried into the https host (that would
+     * drive TLS at port 80). */
+    smm_connection conn = smm_asset_connect ("http://example.com:80", "user", "pass");
     ck_assert_ptr_nonnull (conn);
     ck_assert_int_eq (smm_connection_try_https_upgrade (conn, "https://example.com/accounts/login/"), true);
     ck_assert_str_eq (conn->host, "https://example.com");
@@ -2717,10 +2766,14 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_https_upgrade_different_host);
     tcase_add_test (tc_conn, test_https_upgrade_subdomain);
     tcase_add_test (tc_conn, test_https_upgrade_different_port);
+    tcase_add_test (tc_conn, test_https_upgrade_explicit_default_ports);
+    tcase_add_test (tc_conn, test_https_upgrade_hostname_case_insensitive);
+    tcase_add_test (tc_conn, test_https_upgrade_ipv6_literal);
     tcase_add_test (tc_conn, test_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_https_upgrade_non_http_http_host);
     tcase_add_test (tc_conn, test_https_upgrade_already_https);
     tcase_add_test (tc_conn, test_try_https_upgrade_switches_host);
+    tcase_add_test (tc_conn, test_try_https_upgrade_drops_explicit_default_port);
     tcase_add_test (tc_conn, test_try_https_upgrade_rejects_other_host);
     tcase_add_test (tc_conn, test_try_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_try_https_upgrade_preserves_port);
