@@ -899,9 +899,10 @@ smm_asset_set_command_from_plaintext (smm_asset asset, const char *data, size_t 
 }
 
 /* ASCII-only, case-insensitive comparison of the first n bytes. Used for
- * media-type matching so the result does not depend on the caller's locale
- * (e.g. the Turkish dotless-i rule that would break strncasecmp). */
-static bool
+ * media-type and hostname matching so the result does not depend on the
+ * caller's locale (e.g. the Turkish dotless-i rule that would break
+ * strncasecmp). */
+bool
 smm_ascii_caseeq (const char *a, const char *b, size_t n)
 {
     for (size_t i = 0; i < n; i++)

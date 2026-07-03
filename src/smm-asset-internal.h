@@ -227,3 +227,8 @@ bool smm_connection_try_https_upgrade (smm_connection conn, const char *redirect
  * ASCII case, leading whitespace, and any parameters (e.g. "; charset=utf-8").
  * A NULL content_type returns false. */
 bool smm_content_type_is_json (const char *content_type);
+
+/* ASCII-only, case-insensitive comparison of the first n bytes; stops (and
+ * mismatches) at a NUL on either side. Locale-independent, unlike
+ * strncasecmp. */
+bool smm_ascii_caseeq (const char *a, const char *b, size_t n);

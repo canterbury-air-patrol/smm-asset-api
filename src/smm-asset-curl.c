@@ -697,8 +697,16 @@ smm_connection_try_https_upgrade (smm_connection conn, const char *redirect_url)
     if (strncmp (conn->host, http_scheme, http_scheme_len) == 0
         && smm_https_upgrade_is_same_host (conn->host, redirect_url))
     {
+        /* Adopt the redirect's authority rather than reusing the http one:
+         * the two may differ in default-port spelling ("http://host:80" must
+         * become "https://host", not "https://host:80", which would drive TLS
+         * at port 80). Any base path is preserved from the original host. */
+        const char *orig_auth = conn->host + http_scheme_len;
+        size_t orig_auth_len = strcspn (orig_auth, "/?#");
+        const char *redir_auth = redirect_url + sizeof ("https://") - 1;
+        size_t redir_auth_len = strcspn (redir_auth, "/?#");
         char *new_host = NULL;
-        if (asprintf (&new_host, "https://%s", conn->host + http_scheme_len) >= 0)
+        if (asprintf (&new_host, "https://%.*s%s", (int)redir_auth_len, redir_auth, orig_auth + orig_auth_len) >= 0)
         {
             free (conn->host);
             conn->host = new_host;
@@ -872,6 +880,47 @@ smm_httpcode_is_redirect (long httpcode)
     return httpcode == HTTP_MOVED_PERMANENTLY || httpcode == HTTP_FOUND || httpcode == HTTP_SEE_OTHER;
 }
 
+/* Split an authority span ("host[:port]", len bytes, not NUL-terminated at
+ * len) into its host and optional port. Handles bracketed IPv6 literals, whose
+ * colons are part of the host. A missing port leaves *port NULL. */
+static void
+smm_split_authority (const char *auth, size_t len, const char **host, size_t *host_len, const char **port,
+                     size_t *port_len)
+{
+    *host = auth;
+    *host_len = len;
+    *port = NULL;
+    *port_len = 0;
+
+    const char *colon = NULL;
+    if (len > 0 && auth[0] == '[')
+    {
+        /* Bracketed IPv6 literal: the host is the bracketed span; a port may
+         * follow after "]:". An unterminated bracket leaves the whole span as
+         * the host (it will simply fail to match a well-formed one). */
+        const char *close = memchr (auth, ']', len);
+        if (close == NULL)
+        {
+            return;
+        }
+        *host_len = (size_t)(close + 1 - auth);
+        if (*host_len < len && close[1] == ':')
+        {
+            colon = close + 1;
+        }
+    }
+    else
+    {
+        colon = memchr (auth, ':', len);
+    }
+    if (colon != NULL)
+    {
+        *host_len = (size_t)(colon - auth);
+        *port = colon + 1;
+        *port_len = len - (size_t)(*port - auth);
+    }
+}
+
 bool
 smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirect)
 {
@@ -882,14 +931,50 @@ smm_https_upgrade_is_same_host (const char *http_host, const char *https_redirec
     if (strncmp (https_redirect, "https://", 8) != 0)
         return false;
 
-    const char *orig_host = http_host + 7;
-    const char *redir_host = https_redirect + 8;
+    const char *orig_auth = http_host + 7;
+    const char *redir_auth = https_redirect + 8;
 
-    /* Host ends at '/', '?', '#', or end of string */
-    size_t orig_len = strcspn (orig_host, "/?#");
-    size_t redir_len = strcspn (redir_host, "/?#");
+    /* The authority ends at '/', '?', '#', or end of string */
+    size_t orig_auth_len = strcspn (orig_auth, "/?#");
+    size_t redir_auth_len = strcspn (redir_auth, "/?#");
 
-    return orig_len == redir_len && strncmp (orig_host, redir_host, orig_len) == 0;
+    const char *orig_host = NULL;
+    const char *redir_host = NULL;
+    const char *orig_port = NULL;
+    const char *redir_port = NULL;
+    size_t orig_host_len = 0;
+    size_t redir_host_len = 0;
+    size_t orig_port_len = 0;
+    size_t redir_port_len = 0;
+    smm_split_authority (orig_auth, orig_auth_len, &orig_host, &orig_host_len, &orig_port, &orig_port_len);
+    smm_split_authority (redir_auth, redir_auth_len, &redir_host, &redir_host_len, &redir_port, &redir_port_len);
+
+    /* DNS names are case-insensitive, so compare the hostnames that way; an
+     * empty host never matches. */
+    if (orig_host_len == 0 || orig_host_len != redir_host_len
+        || !smm_ascii_caseeq (orig_host, redir_host, orig_host_len))
+        return false;
+
+    /* A missing port means the scheme default. */
+    if (orig_port == NULL)
+    {
+        orig_port = "80";
+        orig_port_len = 2;
+    }
+    if (redir_port == NULL)
+    {
+        redir_port = "443";
+        redir_port_len = 3;
+    }
+
+    /* Same explicit port carried through (e.g. :8080 -> :8080), or the
+     * standard http->https default-port upgrade (80 -> 443, spelled out or
+     * implied). Anything else (e.g. :8080 -> :8443) is not verifiably the
+     * same server, so the downgrade guard stays closed. */
+    if (orig_port_len == redir_port_len && strncmp (orig_port, redir_port, orig_port_len) == 0)
+        return true;
+    return orig_port_len == 2 && strncmp (orig_port, "80", 2) == 0 && redir_port_len == 3
+           && strncmp (redir_port, "443", 3) == 0;
 }
 
 struct smm_curl_res_s *
