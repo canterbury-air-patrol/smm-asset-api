@@ -720,9 +720,23 @@ capture_search_server_thread (void *arg)
             }
             used += (size_t)nread;
             srv->request[used] = '\0';
-            if (strstr (srv->request, "\r\n\r\n") != NULL)
+            /* Read past the header block until the whole Content-Length body
+             * has arrived too, so a request whose body lands in a separate
+             * TCP segment is still captured completely. */
+            const char *hdr_end = strstr (srv->request, "\r\n\r\n");
+            if (hdr_end != NULL)
             {
-                break;
+                size_t body_want = 0;
+                const char *cl = strstr (srv->request, "Content-Length: ");
+                if (cl != NULL)
+                {
+                    body_want = strtoul (cl + sizeof ("Content-Length: ") - 1, NULL, 10);
+                }
+                size_t body_have = used - (size_t)(hdr_end + 4 - srv->request);
+                if (body_have >= body_want)
+                {
+                    break;
+                }
             }
         }
         srv->request[used] = '\0';
@@ -837,20 +851,22 @@ check_search_action_sends_post (bool (*action) (smm_search), const char *expecte
     smm_connection_close (conn);
 
     ck_assert_ptr_nonnull (strstr (srv.request, expected_request_line));
-    /* An empty POST body: asset_id travels in the query string. */
-    ck_assert_ptr_nonnull (strstr (srv.request, "Content-Length: 0\r\n"));
+    /* asset_id must be in the POST body (anchored after the header block):
+     * on a POST the server reads form data only, so a query-string asset_id
+     * is invisible and the action 404s. */
+    ck_assert_ptr_nonnull (strstr (srv.request, "\r\n\r\nasset_id=7"));
     ck_assert_ptr_nonnull (strstr (srv.request, "X-CSRFToken: tok123abc\r\n"));
 }
 
 START_TEST (test_search_accept_sends_post)
 {
-    check_search_action_sends_post (smm_search_accept, "POST /search/1/begin/?asset_id=7 HTTP/1.1");
+    check_search_action_sends_post (smm_search_accept, "POST /search/1/begin/ HTTP/1.1");
 }
 END_TEST
 
 START_TEST (test_search_complete_sends_post)
 {
-    check_search_action_sends_post (smm_search_complete, "POST /search/1/finished/?asset_id=7 HTTP/1.1");
+    check_search_action_sends_post (smm_search_complete, "POST /search/1/finished/ HTTP/1.1");
 }
 END_TEST
 
