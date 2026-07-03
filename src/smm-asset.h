@@ -356,12 +356,19 @@ bool smm_asset_last_goto_pos (smm_asset asset, double *lat, double *lon);
 /**
  * Get a search to perform from the SMM
  *
+ * A NULL return is ambiguous without consulting the error state, which this
+ * call clears on entry: NULL with @ref smm_asset_get_last_error reporting
+ * SMM_ERROR_NONE means the server has no suitable search right now (a clean
+ * outcome, worth retrying later); NULL with any other code is a failure
+ * (network, server, parse, ...).
+ *
  * @param asset The Asset to conduct the search
  * @param latitude the current latitude of the asset in degrees
  * @param longitude the current longitude of the asset in degrees
  *
- * @return the closest or next queued search for this asset type, it will need to be accepted with @ref
- * smm_search_accept before searching begins
+ * @return the closest or next queued search for this asset type, or NULL (see
+ * above). A returned search must be accepted with @ref smm_search_accept
+ * before searching begins
  */
 smm_search smm_asset_get_search (smm_asset asset, double latitude, double longitude);
 

@@ -57,16 +57,32 @@ int main(int argc, char *argv[])
 		/* Report this assets position as 43 deg South, 172 deg East, 35 meters high, heading west, 3d fix */ 
 		smm_asset_report_position (asset, -43, 172, 35, 270, 3);
 
-		/* You can also get a search to conduct by */
-		smm_search search;
-		while ((search = smm_asset_get_search (asset, -43, 172)) != NULL)
+		/* You can also get a search to conduct. A declined accept (another
+		 * asset may have taken the search first) is retried with a fresh
+		 * lookup, bounded so a persistent decline cannot loop forever. */
+		smm_search search = NULL;
+		for (int attempt = 0; attempt < 3; attempt++)
 		{
+			search = smm_asset_get_search (asset, -43, 172);
+			if (search == NULL)
+			{
+				if (smm_asset_get_last_error (asset, NULL, 0) == SMM_ERROR_NONE)
+				{
+					/* No suitable search right now; try again later */
+				}
+				else
+				{
+					/* The lookup failed (network/server error) */
+				}
+				break;
+			}
 			if (smm_search_accept (search))
 			{
 				break;
 			}
 			/* The server declined this search; discard it and ask again */
 			smm_search_destroy (search);
+			search = NULL;
 		}
 
 		if (search != NULL)
