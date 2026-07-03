@@ -669,6 +669,7 @@ smm_asset_get_assets (smm_connection connection, smm_assets *assets, size_t *ass
     if (res == NULL)
     {
         smm_connection_set_error (connection, SMM_ERROR_NETWORK, "network failure fetching /assets/");
+        free (buf.data);
         return false;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
@@ -1311,6 +1312,7 @@ smm_search_get_waypoints (smm_search search, smm_waypoints *waypoints, size_t *w
     if (res == NULL)
     {
         smm_search_set_error (search, SMM_ERROR_NETWORK, "network failure fetching waypoints");
+        free (buf.data);
         return false;
     }
     else if (!(res->success && res->httpcode == HTTP_SUCCESS))
@@ -1373,6 +1375,7 @@ smm_search_action (smm_search search, const char *action)
     if (res == NULL)
     {
         smm_search_set_error (search, SMM_ERROR_NETWORK, "network failure sending %s action", action);
+        free (buf.data);
         return false;
     }
     if (!(res->success && res->httpcode == HTTP_SUCCESS))
