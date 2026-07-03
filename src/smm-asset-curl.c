@@ -363,6 +363,17 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     }
 
     pthread_mutex_lock (&conn->lock);
+    /* A NULL share means smm_asset_connect failed to initialise libcurl (the
+     * connection is in SMM_CONNECTION_FAILURE with the error recorded).
+     * Refuse the request up front rather than driving libcurl without its
+     * global init. */
+    if (conn->share == NULL)
+    {
+        pthread_mutex_unlock (&conn->lock);
+        DEBUG ("connection has no share (initialisation failed); refusing request\n");
+        free (res);
+        return NULL;
+    }
     verify_tls = conn->verify_tls;
     connect_timeout = conn->connect_timeout_secs;
     transfer_timeout = conn->transfer_timeout_secs;
