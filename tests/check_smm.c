@@ -1640,6 +1640,26 @@ START_TEST (test_https_upgrade_non_http_http_host)
 }
 END_TEST
 
+START_TEST (test_request_refused_without_share)
+{
+    /* A connection whose libcurl share is missing is one whose
+     * initialisation failed (smm_asset_connect returns it in
+     * SMM_CONNECTION_FAILURE); the request path must refuse it up front
+     * rather than driving libcurl unconfigured. Simulate by destroying the
+     * share on an otherwise-valid connection. */
+    smm_connection conn = smm_asset_connect ("http://127.0.0.1:1", "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_connection_share_destroy (conn);
+
+    struct buffer_s buf = { NULL, 0 };
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (conn, "/assets/", NULL, &buf, false);
+    ck_assert_ptr_null (res);
+    ck_assert_ptr_null (buf.data);
+
+    smm_connection_close (conn);
+}
+END_TEST
+
 START_TEST (test_redirect_is_login_page_matches)
 {
     ck_assert_int_eq (smm_redirect_is_login_page ("https://example.com/accounts/login/"), true);
@@ -2870,6 +2890,7 @@ smm_suite (void)
     tcase_add_test (tc_conn, test_https_upgrade_null_args);
     tcase_add_test (tc_conn, test_https_upgrade_non_http_http_host);
     tcase_add_test (tc_conn, test_https_upgrade_already_https);
+    tcase_add_test (tc_conn, test_request_refused_without_share);
     tcase_add_test (tc_conn, test_redirect_is_login_page_matches);
     tcase_add_test (tc_conn, test_redirect_is_login_page_rejects_lookalikes);
     tcase_add_test (tc_conn, test_try_https_upgrade_switches_host);

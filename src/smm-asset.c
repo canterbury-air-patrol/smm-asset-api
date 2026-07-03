@@ -196,17 +196,24 @@ smm_asset_connect (const char *host, const char *user, const char *pass)
     /* libcurl's global state must be initialised before any other libcurl call
      * (curl_share_init and curl_url below, and every request on this
      * connection). Do it here, the single chokepoint through which every
-     * libcurl-using path is reached. */
+     * libcurl-using path is reached.
+     *
+     * Initialisation failures return the connection in SMM_CONNECTION_FAILURE
+     * with a last_error recorded, never NULL (NULL is reserved for allocation
+     * failure), so callers have one convention to check. Either failure leaves
+     * conn->share NULL, which the request path refuses up front. */
     if (!smm_curl_global_init ())
     {
         conn->state = SMM_CONNECTION_FAILURE;
+        smm_connection_set_error (conn, SMM_ERROR_NETWORK, "libcurl initialisation failed");
         return conn;
     }
 
     if (!smm_connection_share_init (conn))
     {
-        smm_connection_unref (conn);
-        return NULL;
+        conn->state = SMM_CONNECTION_FAILURE;
+        smm_connection_set_error (conn, SMM_ERROR_NETWORK, "libcurl share initialisation failed");
+        return conn;
     }
 
     /* Early host validation, on the normalised host actually used in URLs */
