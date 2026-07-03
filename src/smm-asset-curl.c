@@ -111,6 +111,11 @@ smm_build_login_post_data (const char *csrf, const char *user, const char *pass,
         ok = true;
     }
 
+    /* The escaped copies carry the credentials; scrub them before freeing,
+     * matching the treatment of the originals in smm_connection_unref. */
+    smm_secure_clear (esc_csrf);
+    smm_secure_clear (esc_user);
+    smm_secure_clear (esc_pass);
     curl_free (esc_csrf);
     curl_free (esc_user);
     curl_free (esc_pass);
@@ -781,6 +786,13 @@ smm_asset_connection_login (smm_connection connection)
                     new_state = SMM_CONNECTION_AUTHENTICATION_FAILURE;
                 }
                 smm_curl_res_free (res_post);
+                /* post_data contains "password=<escaped password>"; scrub it
+                 * before freeing so the login round-trip does not leave a
+                 * plaintext copy of the password in the heap. (libcurl's
+                 * CURLOPT_POSTFIELDS keeps a pointer rather than a copy, so
+                 * this and the escaped fragments in smm_build_login_post_data
+                 * are the only heap copies within our reach.) */
+                smm_secure_clear (post_data);
                 free (post_data);
             }
             else
