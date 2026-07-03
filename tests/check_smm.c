@@ -676,8 +676,31 @@ struct capture_request_server_s
 {
     int listen_fd;
     uint16_t port;
+    /* HTTP status to answer with: 0 (or 200) responds 200 with a valid
+     * closest-search JSON body; 404 responds with a plain-text not-found. */
+    long status;
     char request[2048];
 };
+
+/* Bind the capture server to an ephemeral loopback port and start listening;
+ * fills in listen_fd and port. */
+static void
+capture_server_listen (struct capture_request_server_s *srv)
+{
+    struct sockaddr_in addr;
+    socklen_t addr_len = sizeof (addr);
+
+    srv->listen_fd = socket (AF_INET, SOCK_STREAM, 0);
+    ck_assert_int_ge (srv->listen_fd, 0);
+    memset (&addr, 0, sizeof (addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    ck_assert_int_eq (bind (srv->listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
+    ck_assert_int_eq (listen (srv->listen_fd, 1), 0);
+    ck_assert_int_eq (getsockname (srv->listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
+    srv->port = ntohs (addr.sin_port);
+}
 
 static bool
 write_all (int fd, const char *buf, size_t len)
@@ -741,9 +764,24 @@ capture_search_server_thread (void *arg)
         }
         srv->request[used] = '\0';
 
-        const char body[] = "{\"object_url\":\"/search/1/\",\"distance\":10,\"length\":100,\"sweep_width\":50}";
         char resp[512];
-        int n = snprintf (resp, sizeof (resp),
+        int n;
+        if (srv->status == 404)
+        {
+            const char body[] = "No suitable searches exist";
+            n = snprintf (resp, sizeof (resp),
+                          "HTTP/1.1 404 Not Found\r\n"
+                          "Content-Type: text/plain\r\n"
+                          "Content-Length: %zu\r\n"
+                          "Connection: close\r\n"
+                          "\r\n"
+                          "%s",
+                          sizeof (body) - 1, body);
+        }
+        else
+        {
+            const char body[] = "{\"object_url\":\"/search/1/\",\"distance\":10,\"length\":100,\"sweep_width\":50}";
+            n = snprintf (resp, sizeof (resp),
                           "HTTP/1.1 200 OK\r\n"
                           "Content-Type: application/json\r\n"
                           "Content-Length: %zu\r\n"
@@ -751,6 +789,7 @@ capture_search_server_thread (void *arg)
                           "\r\n"
                           "%s",
                           sizeof (body) - 1, body);
+        }
         if (n > 0 && (size_t)n < sizeof (resp))
         {
             (void)!write_all (fd, resp, (size_t)n);
@@ -763,20 +802,9 @@ capture_search_server_thread (void *arg)
 START_TEST (test_get_search_requests_json)
 {
     struct capture_request_server_s srv;
-    struct sockaddr_in addr;
-    socklen_t addr_len = sizeof (addr);
 
     memset (&srv, 0, sizeof (srv));
-    srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
-    ck_assert_int_ge (srv.listen_fd, 0);
-    memset (&addr, 0, sizeof (addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
-    addr.sin_port = 0;
-    ck_assert_int_eq (bind (srv.listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
-    ck_assert_int_eq (listen (srv.listen_fd, 1), 0);
-    ck_assert_int_eq (getsockname (srv.listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
-    srv.port = ntohs (addr.sin_port);
+    capture_server_listen (&srv);
 
     pthread_t thread;
     ck_assert_int_eq (pthread_create (&thread, NULL, capture_search_server_thread, &srv), 0);
@@ -802,29 +830,55 @@ START_TEST (test_get_search_requests_json)
 }
 END_TEST
 
+START_TEST (test_get_search_404_clears_prior_error)
+{
+    /* The documented contract: NULL with the asset error left SMM_ERROR_NONE
+     * is the clean "no suitable search" outcome. An error seated by an
+     * earlier failed call must be cleared on entry so it cannot masquerade
+     * as this call's failure. */
+    struct capture_request_server_s srv;
+
+    memset (&srv, 0, sizeof (srv));
+    srv.status = 404;
+    capture_server_listen (&srv);
+
+    pthread_t thread;
+    ck_assert_int_eq (pthread_create (&thread, NULL, capture_search_server_thread, &srv), 0);
+
+    char host[64];
+    snprintf (host, sizeof (host), "http://127.0.0.1:%u", srv.port);
+    smm_connection conn = smm_asset_connect (host, "user", "pass");
+    ck_assert_ptr_nonnull (conn);
+    smm_asset asset = smm_asset_create (conn, "A", "T", 1, 1);
+    ck_assert_ptr_nonnull (asset);
+
+    /* Seat a prior error on the asset. */
+    ck_assert_int_eq (smm_asset_report_position (asset, 999.0, 0.0, 0, 0, 3), false);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_INVALID_ARG);
+
+    smm_search search = smm_asset_get_search (asset, -43.5, 172.6);
+    ck_assert_ptr_null (search);
+    ck_assert_int_eq (smm_asset_get_last_error (asset, NULL, 0), SMM_ERROR_NONE);
+
+    smm_asset_free_asset (asset);
+    smm_connection_close (conn);
+    pthread_join (thread, NULL);
+    close (srv.listen_fd);
+}
+END_TEST
+
 /* Search state changes (begin/finished) are @require_POST on the server: a
  * GET is answered with 405 and the search can never be accepted. Drive one
  * action against a capture server and assert the wire format: the POST
- * request line with asset_id in the query string, the empty body, and the
- * session's CSRF token presented as a header. */
+ * request line, asset_id in the POST body, and the session's CSRF token
+ * presented as a header. */
 static void
 check_search_action_sends_post (bool (*action) (smm_search), const char *expected_request_line)
 {
     struct capture_request_server_s srv;
-    struct sockaddr_in addr;
-    socklen_t addr_len = sizeof (addr);
 
     memset (&srv, 0, sizeof (srv));
-    srv.listen_fd = socket (AF_INET, SOCK_STREAM, 0);
-    ck_assert_int_ge (srv.listen_fd, 0);
-    memset (&addr, 0, sizeof (addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
-    addr.sin_port = 0;
-    ck_assert_int_eq (bind (srv.listen_fd, (struct sockaddr *)&addr, sizeof (addr)), 0);
-    ck_assert_int_eq (listen (srv.listen_fd, 1), 0);
-    ck_assert_int_eq (getsockname (srv.listen_fd, (struct sockaddr *)&addr, &addr_len), 0);
-    srv.port = ntohs (addr.sin_port);
+    capture_server_listen (&srv);
 
     pthread_t thread;
     ck_assert_int_eq (pthread_create (&thread, NULL, capture_search_server_thread, &srv), 0);
@@ -2996,6 +3050,7 @@ smm_suite (void)
     tcase_add_test (tc_search, test_search_from_response_valid_returns_search);
     tcase_add_test (tc_search, test_search_from_response_server_error_sets_server);
     tcase_add_test (tc_search, test_get_search_requests_json);
+    tcase_add_test (tc_search, test_get_search_404_clears_prior_error);
     tcase_add_test (tc_search, test_search_accept_sends_post);
     tcase_add_test (tc_search, test_search_complete_sends_post);
     suite_add_tcase (s, tc_search);
