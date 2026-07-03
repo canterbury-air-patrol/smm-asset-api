@@ -17,7 +17,7 @@ libsmmasset_internal_la_LIBADD = $(TIDY_LIBS) $(CURL_LIBS) $(JANSSON_LIBS)
 lib_LTLIBRARIES = libsmmasset.la
 libsmmasset_la_SOURCES =
 libsmmasset_la_LIBADD = libsmmasset-internal.la $(TIDY_LIBS) $(CURL_LIBS) $(JANSSON_LIBS)
-libsmmasset_la_LDFLAGS = -no-undefined -version-info 1:0:1 -export-symbols $(srcdir)/libsmmasset.sym
+libsmmasset_la_LDFLAGS = -no-undefined -version-info 1:1:1 -export-symbols $(srcdir)/libsmmasset.sym
 
 EXTRA_DIST = libsmmasset.sym
 

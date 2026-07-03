@@ -34,7 +34,7 @@
  */
 #define SMM_VERSION_MAJOR 1
 #define SMM_VERSION_MINOR 1
-#define SMM_VERSION_PATCH 0
+#define SMM_VERSION_PATCH 1
 
 /* Compose "major.minor.patch" from the numbers above (two-step expansion so the
  * macro values, not their names, are stringified). */
