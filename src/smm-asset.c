@@ -1330,40 +1330,44 @@ smm_search_action (smm_search search, const char *action)
         return false;
     }
     char *action_page = NULL;
+    char *body = NULL;
     struct buffer_s buf = { NULL, 0 };
 
     /* Build the path from the parsed search id, not a server string, so it can
      * only ever be /search/<id>/<action>/. */
-    if (asprintf (&action_page, "/search/%lld/%s/?asset_id=%lli", search->search_id, action, search->asset_id) < 0)
+    if (asprintf (&action_page, "/search/%lld/%s/", search->search_id, action) < 0)
     {
+        return false;
+    }
+    /* POST, not GET: search state changes (begin/finished) are @require_POST
+     * on the server since the CSRF hardening that also moved position
+     * reporting to POST. asset_id must travel in the POST body: on a POST the
+     * server reads it from the form data only, so a query-string asset_id is
+     * invisible and the action 404s. */
+    if (asprintf (&body, "asset_id=%lli", search->asset_id) < 0)
+    {
+        free (action_page);
         return false;
     }
     smm_search_clear_error (search);
 
-    /* POST, not GET: search state changes (begin/finished) are @require_POST
-     * on the server since the CSRF hardening that also moved position
-     * reporting to POST.  An empty body is enough -- asset_id rides in the
-     * query string and the view accepts it from GET or POST. */
-    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, action_page, "", &buf, false);
+    struct smm_curl_res_s *res = smm_connection_curl_retrieve_url (search->conn, action_page, body, &buf, false);
+    free (action_page);
+    free (body);
     if (res == NULL)
     {
         smm_search_set_error (search, SMM_ERROR_NETWORK, "network failure sending %s action", action);
-        free (action_page);
         return false;
     }
-    else if (!(res->success && res->httpcode == HTTP_SUCCESS))
+    if (!(res->success && res->httpcode == HTTP_SUCCESS))
     {
         smm_search_set_error (search, SMM_ERROR_SERVER, "unexpected HTTP %ld from %s action", res->httpcode, action);
         smm_curl_res_free (res);
-        free (action_page);
         free (buf.data);
         return false;
     }
 
     smm_curl_res_free (res);
-    free (action_page);
-    action_page = NULL;
-
     free (buf.data);
 
     return true;
