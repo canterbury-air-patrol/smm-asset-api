@@ -58,6 +58,18 @@ smm_secure_clear (char *s)
 #endif
 }
 
+void
+smm_secure_free (char **p)
+{
+    if (p == NULL || *p == NULL)
+    {
+        return;
+    }
+    smm_secure_clear (*p);
+    free (*p);
+    *p = NULL;
+}
+
 /*
  * SMM expects coordinates in URLs formatted with '.' as the decimal separator.
  * printf-family conversions honour the thread's LC_NUMERIC, so a caller running
@@ -469,12 +481,9 @@ smm_connection_unref (smm_connection connection)
         free (connection->host);
         /* Scrub the credentials and session token from memory before freeing,
          * so they do not linger in the heap after the connection is closed. */
-        smm_secure_clear (connection->user);
-        free (connection->user);
-        smm_secure_clear (connection->pass);
-        free (connection->pass);
-        smm_secure_clear (connection->csrfmiddlewaretoken);
-        free (connection->csrfmiddlewaretoken);
+        smm_secure_free (&connection->user);
+        smm_secure_free (&connection->pass);
+        smm_secure_free (&connection->csrfmiddlewaretoken);
         smm_connection_share_destroy (connection);
         pthread_cond_destroy (&connection->login_cond);
         pthread_mutex_destroy (&connection->io_lock);

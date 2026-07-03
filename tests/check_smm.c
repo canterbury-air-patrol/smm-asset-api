@@ -1469,6 +1469,21 @@ END_TEST
 START_TEST (test_secure_clear_null_safe) { smm_secure_clear (NULL); /* must not crash */ }
 END_TEST
 
+START_TEST (test_secure_free_nulls_pointer)
+{
+    char *s = strdup ("s3cr3t-password");
+    ck_assert_ptr_nonnull (s);
+    smm_secure_free (&s);
+    /* The pointer is NULLed, so a repeat call (a would-be double free) is a
+     * safe no-op. The scrub itself is covered by the secure_clear tests. */
+    ck_assert_ptr_null (s);
+    smm_secure_free (&s);
+}
+END_TEST
+
+START_TEST (test_secure_free_null_safe) { smm_secure_free (NULL); /* must not crash */ }
+END_TEST
+
 START_TEST (test_content_type_is_json_plain) { ck_assert_int_eq (smm_content_type_is_json ("application/json"), true); }
 END_TEST
 
@@ -3089,6 +3104,8 @@ smm_suite (void)
     tcase_add_test (tc_secure, test_secure_clear_zeroes);
     tcase_add_test (tc_secure, test_secure_clear_empty_string);
     tcase_add_test (tc_secure, test_secure_clear_null_safe);
+    tcase_add_test (tc_secure, test_secure_free_nulls_pointer);
+    tcase_add_test (tc_secure, test_secure_free_null_safe);
     suite_add_tcase (s, tc_secure);
 
     TCase *tc_content_type = tcase_create ("ContentType");
