@@ -85,6 +85,31 @@ START_TEST (test_csrf_extraction_deeply_nested)
 }
 END_TEST
 
+START_TEST (test_csrf_extraction_valueless_attribute)
+{
+    /* Tidy reports NULL for the value of a valueless attribute; the walker
+     * must skip it, not dereference it. Regression test for a segfault on
+     * "<input name>". */
+    const char *html = "<html><body><input name><input name value>"
+                       "<input name=\"csrfmiddlewaretoken\" value></body></html>";
+    char *token = smm_parse_csrf_token (html, strlen (html));
+    ck_assert_ptr_null (token);
+}
+END_TEST
+
+START_TEST (test_csrf_extraction_valueless_then_valid)
+{
+    /* A valueless attribute earlier in the document must not stop a later,
+     * well-formed token from being extracted. */
+    const char *html = "<html><body><input name>"
+                       "<input name=\"csrfmiddlewaretoken\" value=\"abcd1234\"></body></html>";
+    char *token = smm_parse_csrf_token (html, strlen (html));
+    ck_assert_ptr_nonnull (token);
+    ck_assert_str_eq (token, "abcd1234");
+    free (token);
+}
+END_TEST
+
 START_TEST (test_assets_parsing)
 {
     const char *json = "{\"assets\": [{\"id\": 1, \"type_id\": 2, \"name\": \"Asset 1\", \"type_name\": \"Type "
@@ -2783,6 +2808,8 @@ smm_suite (void)
     tcase_add_test (tc_csrf, test_csrf_extraction_invalid_chars);
     tcase_add_test (tc_csrf, test_csrf_extraction_too_long);
     tcase_add_test (tc_csrf, test_csrf_extraction_deeply_nested);
+    tcase_add_test (tc_csrf, test_csrf_extraction_valueless_attribute);
+    tcase_add_test (tc_csrf, test_csrf_extraction_valueless_then_valid);
     suite_add_tcase (s, tc_csrf);
 
     TCase *tc_assets = tcase_create ("Assets");
