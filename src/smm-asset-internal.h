@@ -163,6 +163,13 @@ void smm_connection_share_destroy (smm_connection conn);
  * cannot elide. NULL-safe. Exposed for testing. */
 void smm_secure_clear (char *s);
 
+/* Scrub *p and free() it, then NULL the pointer, so a secret's heap copy can
+ * neither be freed unscrubbed nor double-freed. Safe on NULL p or *p. Only
+ * for memory owned by free(): buffers from curl_easy_escape must still be
+ * scrubbed with smm_secure_clear and released with curl_free. Exposed for
+ * testing. */
+void smm_secure_free (char **p);
+
 void smm_connection_ref (smm_connection conn);
 void smm_connection_unref (smm_connection conn);
 void smm_connection_set_error (smm_connection conn, smm_error_code code, const char *fmt, ...)
