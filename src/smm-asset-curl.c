@@ -309,12 +309,15 @@ smm_connection_update_csrf_from_cookies (smm_connection conn, CURL *curl)
         return;
     }
 
+    /* Scrub every superseded token copy before freeing it, the same treatment
+     * smm_connection_unref gives the stored one. */
     char *token = NULL;
     for (const struct curl_slist *c = cookies; c != NULL; c = c->next)
     {
         char *value = smm_cookie_value_if_name (c->data, "csrftoken");
         if (value)
         {
+            smm_secure_clear (token);
             free (token);
             token = value;
         }
@@ -324,6 +327,7 @@ smm_connection_update_csrf_from_cookies (smm_connection conn, CURL *curl)
     if (token)
     {
         pthread_mutex_lock (&conn->lock);
+        smm_secure_clear (conn->csrfmiddlewaretoken);
         free (conn->csrfmiddlewaretoken);
         conn->csrfmiddlewaretoken = token;
         pthread_mutex_unlock (&conn->lock);
@@ -456,6 +460,11 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
         if (asprintf (&csrf_header, "X-CSRFToken: %s", csrf_token) >= 0)
         {
             headers = curl_slist_append (headers, csrf_header);
+            /* curl_slist_append took a copy, so scrub ours before freeing.
+             * The slist's copy is freed unscrubbed by curl_slist_free_all —
+             * the same out-of-reach boundary as libcurl's cookie jar, which
+             * holds the session cookie itself. */
+            smm_secure_clear (csrf_header);
             free (csrf_header);
         }
     }
@@ -521,6 +530,7 @@ smm_connection_curl_retrieve_url_r (smm_connection conn, const char *path, const
     }
 
 out:
+    smm_secure_clear (csrf_token);
     free (csrf_token);
     if (headers)
     {
@@ -879,6 +889,7 @@ smm_asset_connection_login (smm_connection connection)
     pthread_cond_broadcast (&connection->login_cond);
     pthread_mutex_unlock (&connection->lock);
 
+    smm_secure_clear (csrf_token);
     free (csrf_token);
     return res;
 }
